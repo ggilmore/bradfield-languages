@@ -77,9 +77,18 @@ func runPrompt(r io.Reader) error {
 }
 
 func run(r io.Reader) error {
-	input, err := io.ReadAll()
+	s, err := NewScanner(r)
 	if err != nil {
-		return fmt.Errorf("when reading input: %s", err)
+		return fmt.Errorf("while intializing scanner: %w", err)
+	}
+
+	tokens, err := s.ScanTokens()
+	if err != nil {
+		return fmt.Errorf("while scanning for tokens: %w", err)
+	}
+
+	for _, t := range tokens {
+		fmt.Printf("%s\n", t)
 	}
 
 	return nil
@@ -90,8 +99,8 @@ type loxError struct {
 	message string
 }
 
-func (*loxError) Error() string {
-	return fmt.Sprintf("[line %d] Error" + "message")
+func (e *loxError) Error() string {
+	return fmt.Sprintf("[line %d] Error: %s", e.line, e.message)
 }
 
 func NewLoxError(line int, message string) error {

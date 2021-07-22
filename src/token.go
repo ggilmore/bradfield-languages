@@ -17,6 +17,7 @@ const (
 	Slash
 	Star
 
+	Equal
 	Bang
 	BangEqual
 	EqualEqual
@@ -74,6 +75,8 @@ func (t TokenType) String() string {
 	case Star:
 		return "Star"
 
+	case Equal:
+		return "Equal"
 	case Bang:
 		return "Bang"
 	case BangEqual:
@@ -137,13 +140,32 @@ func (t TokenType) String() string {
 
 }
 
+var Keywords = map[string]TokenType{
+	"and":    And,
+	"class":  Class,
+	"else":   Else,
+	"false":  False,
+	"for":    For,
+	"fun":    Fun,
+	"if":     If,
+	"nil":    Nil,
+	"or":     Or,
+	"print":  Print,
+	"return": Return,
+	"super":  Super,
+	"this":   This,
+	"true":   True,
+	"var":    Var,
+	"while":  While,
+}
+
 type Token struct {
 	kind    TokenType
 	lexeme  string
-	literal string
+	literal interface{}
 	line    int
 }
 
-func (t *Token) String() string {
-	return fmt.Sprintf("%s: %q %q", t.kind.String(), t.lexeme, t.literal)
+func (t Token) String() string {
+	return fmt.Sprintf("%s: %q [%v]", t.kind.String(), t.lexeme, t.literal)
 }
