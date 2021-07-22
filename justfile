@@ -7,11 +7,20 @@ render-ci-pipeline:
 
 fmt: format
 
-format: format-dhall prettier format-shfmt
+format: format-dhall prettier format-shfmt gofmt
 
 lint: lint-dhall shellcheck
 
 check: check-dhall
+
+gofmt: format-golang
+format-golang:
+    ./scripts/go-fmt.sh
+
+test: test-golang
+
+test-golang:
+    ./scripts/go-test.sh
 
 prettier:
     yarn run prettier
