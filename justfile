@@ -13,6 +13,10 @@ lint: lint-dhall shellcheck
 
 check: check-dhall
 
+gen: generate
+generate:
+    ./ast_generator/generate.sh
+
 gofmt: format-golang
 format-golang:
     ./scripts/go-fmt.sh
