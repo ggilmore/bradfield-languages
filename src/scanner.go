@@ -271,12 +271,12 @@ func (s *Scanner) addToken(kind TokenType) {
 
 func (s *Scanner) addTokenLiteral(kind TokenType, literal interface{}) {
 	s.tokens = append(s.tokens, Token{
-		kind: kind,
+		Kind: kind,
 
-		lexeme:  string(s.input[s.start:s.current]),
-		literal: literal,
+		Lexeme:  string(s.input[s.start:s.current]),
+		Literal: literal,
 
-		line: s.line,
+		Line: s.line,
 	})
 }
 

@@ -160,12 +160,12 @@ var Keywords = map[string]TokenType{
 }
 
 type Token struct {
-	kind    TokenType
-	lexeme  string
-	literal interface{}
-	line    int
+	Kind    TokenType
+	Lexeme  string
+	Literal interface{}
+	Line    int
 }
 
 func (t Token) String() string {
-	return fmt.Sprintf("%s: %q [%v]", t.kind.String(), t.lexeme, t.literal)
+	return fmt.Sprintf("%s: %q [%v]", t.Kind.String(), t.Lexeme, t.Literal)
 }

@@ -87,9 +87,13 @@ func run(r io.Reader) error {
 		return fmt.Errorf("while scanning for tokens: %w", err)
 	}
 
-	for _, t := range tokens {
-		fmt.Printf("%s\n", t)
+	p := NewParser(tokens)
+	expr, err := p.Parse()
+	if err != nil {
+		return fmt.Errorf("while parsing: %w", err)
 	}
+
+	fmt.Printf("%s\n", expr)
 
 	return nil
 }
