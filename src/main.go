@@ -9,11 +9,15 @@ import (
 )
 
 const (
-	ExUsage = 64
-	ExLox   = 65
+	ExUsage   = 64
+	ExLox     = 65
+	ExRuntime = 70
 )
 
-var hadError bool
+var (
+	hadError        bool
+	hadRuntimeError bool
+)
 
 func main() {
 	if len(os.Args) > 2 {
@@ -32,8 +36,13 @@ func main() {
 
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		if _, ok := err.(*loxError); ok {
+
+		switch err.(type) {
+		case loxError:
 			os.Exit(ExLox)
+
+		case loxRuntimeError:
+			os.Exit(ExRuntime)
 		}
 
 		os.Exit(1)
@@ -93,7 +102,12 @@ func run(r io.Reader) error {
 		return fmt.Errorf("while parsing: %w", err)
 	}
 
-	fmt.Printf("%s\n", expr)
+	expr, err = Evaluate(expr)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println(expr)
 
 	return nil
 }
@@ -103,7 +117,7 @@ type loxError struct {
 	message string
 }
 
-func (e *loxError) Error() string {
+func (e loxError) Error() string {
 	return fmt.Sprintf("[line %d] Error: %s", e.line, e.message)
 }
 

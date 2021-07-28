@@ -1,10 +1,8 @@
 package main
 
-import "github.com/hashicorp/go-multierror"
-
 type Parser struct {
-	input []Token
-	errs  multierror.Error
+	input   []Token
+	current int
 }
 
 func NewParser(input []Token) Parser {
@@ -16,6 +14,17 @@ func NewParser(input []Token) Parser {
 func Parse() (Node, error) {
 	//  ???
 }
+
+func (p *Parser) match(t TokenKind) bool {
+
+}
+
+func ( p *Parser) check(t TokenKind) bool {
+	if p.is
+}
+
+func (p *Parser) advance
+
 
 func (p *Parser) Match(t TokenKind) (Node, error) {
 	switch t {

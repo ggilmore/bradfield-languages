@@ -33,35 +33,36 @@ linters-settings:
 
 # See explanation of linters at https://golangci-lint.run/usage/linters/
 linters:
-#   disable-all: true
-#   enable:
-#     - bodyclose
-#     - deadcode
-#     - dogsled
-#     - dupl
-#     - errcheck
-#     - gocritic
-#     - goimports
-#     - gofmt
-#     - golint
-#     - goprintffuncname
-#     - gosec
-#     - gosimple
-#     - govet
-#     - ineffassign
-#     - interfacer
-#     - nakedret
-#     - nolintlint
-#     - rowserrcheck
-#     - staticcheck
-#     - structcheck
-#     - stylecheck
-#     - typecheck
-#     - unconvert
-#     - unparam
-#     - unused
-#     - varcheck
-#     - whitespace
+  disable-all: true
+  enable:
+    - bodyclose
+    - deadcode
+    - dogsled
+    - dupl
+    - errcheck
+    - gocritic
+    - goimports
+    - gofmt
+    - golint
+    - goprintffuncname
+    - gosec
+    - gosimple
+    - govet
+    - ineffassign
+    - interfacer
+    - nakedret
+    - nolintlint
+    - rowserrcheck
+    - staticcheck
+    - structcheck
+    - stylecheck
+    - typecheck
+    - unconvert
+    - unparam
+    - unused
+    - varcheck
+    - whitespace
+    - exhaustive
 
 run:
   timeout: 5m
