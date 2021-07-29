@@ -126,7 +126,7 @@ func printError(err error) {
 
 type LoxLanguageError interface {
 	IsLoxLanguageError()
-	Error() string
+	error
 }
 
 type loxError struct {
