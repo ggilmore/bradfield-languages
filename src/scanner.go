@@ -139,9 +139,7 @@ func (s *Scanner) scanToken() {
 			err := loxError{s.line, fmt.Sprintf("Unexpected character %q.", c)}
 			s.errs = multierror.Append(s.errs, err)
 		}
-
 	}
-
 }
 
 func (s *Scanner) identifier() {
