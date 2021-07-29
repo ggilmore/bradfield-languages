@@ -1,6 +1,6 @@
 all: check format lint build
 
-build: render-ci-pipeline
+build: render-ci-pipeline go-build
 
 render-ci-pipeline:
     ./scripts/render-ci-pipeline.sh
@@ -16,6 +16,9 @@ check: check-dhall
 gen: generate
 generate:
     ./ast_generator/generate.sh
+
+go-build:
+    ./src/build.sh
 
 gofmt: format-golang
 format-golang:

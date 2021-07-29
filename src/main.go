@@ -17,7 +17,7 @@ const (
 
 func main() {
 	if len(os.Args) > 2 {
-		fmt.Fprintln(os.Stderr, "Usage: jlox [script]")
+		fmt.Fprintln(os.Stderr, "Usage: glox [script]")
 		os.Exit(ExUsage)
 	}
 
