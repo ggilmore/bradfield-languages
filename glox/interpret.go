@@ -29,13 +29,13 @@ func evaluateWith(e Expr, s *Scope) (Literal, error) {
 }
 
 func evaluateLet(l *Let, scope *Scope) (Literal, error) {
-	scope = NewScope(scope)
+	s := NewScope(scope)
 
 	key := l.Identifier.Lexeme
 	value := l.Init
-	scope.Insert(key, value)
+	s.Insert(key, value)
 
-	return evaluateWith(l.Body, scope)
+	return evaluateWith(l.Body, s)
 }
 
 func evaluateVariable(v *Variable, scope *Scope) (Literal, error) {
