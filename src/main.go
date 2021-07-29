@@ -32,13 +32,13 @@ func main() {
 func runFile(path string) {
 	f, err := os.Open(path)
 	if err != nil {
-		fmt.Fprintf(os.Stdout, "opening %q: %s\n", path, err)
+		printError(fmt.Errorf("opening %q: %w", path, err))
 		die(err)
 	}
 
 	err = run(f)
 	if err != nil {
-		fmt.Fprintf(os.Stdout, "running %q: %s\n", path, err)
+		printError(fmt.Errorf("running %q: %w", path, err))
 		die(err)
 	}
 }
@@ -54,7 +54,7 @@ func runPrompt(r io.Reader) {
 
 		err := run(strings.NewReader(line))
 		if err != nil {
-			fmt.Fprintln(os.Stderr, err.Error())
+			printError(err)
 
 			var runErr loxRuntimeError
 			if !errors.As(err, &runErr) {
@@ -111,6 +111,24 @@ func die(e error) {
 	os.Exit(1)
 }
 
+func printError(err error) {
+	var e LoxLanguageError
+	if errors.As(err, &e) {
+		// only print the underlying error if it's a lox
+		// error so that don't clutter the output with
+		// needless context
+		fmt.Fprintln(os.Stderr, e.Error())
+		return
+	}
+
+	fmt.Fprint(os.Stderr, err.Error())
+}
+
+type LoxLanguageError interface {
+	IsLoxLanguageError()
+	Error() string
+}
+
 type loxError struct {
 	line    int
 	message string
@@ -119,3 +137,5 @@ type loxError struct {
 func (e loxError) Error() string {
 	return fmt.Sprintf("[line %d] Error: %s", e.line, e.message)
 }
+
+func (e loxError) IsLoxLanguageError() {}

@@ -2,24 +2,24 @@ package main
 
 import "fmt"
 
-type parser struct {
+type Parser struct {
 	tokens  []Token
 	current int
 }
 
-func NewParser(tokens []Token) *parser {
-	return &parser{tokens: tokens}
+func NewParser(tokens []Token) *Parser {
+	return &Parser{tokens: tokens}
 }
 
-func (p *parser) Parse() (Expr, error) {
+func (p *Parser) Parse() (Expr, error) {
 	return p.expression()
 }
 
-func (p *parser) expression() (Expr, error) {
+func (p *Parser) expression() (Expr, error) {
 	return p.equality()
 }
 
-func (p *parser) equality() (Expr, error) {
+func (p *Parser) equality() (Expr, error) {
 	expr, err := p.comparsion()
 	if err != nil {
 		return nil, err
@@ -42,7 +42,7 @@ func (p *parser) equality() (Expr, error) {
 	return expr, nil
 }
 
-func (p *parser) comparsion() (Expr, error) {
+func (p *Parser) comparsion() (Expr, error) {
 	expr, err := p.term()
 	if err != nil {
 		return nil, err
@@ -64,7 +64,7 @@ func (p *parser) comparsion() (Expr, error) {
 	return expr, nil
 }
 
-func (p *parser) term() (Expr, error) {
+func (p *Parser) term() (Expr, error) {
 	expr, err := p.factor()
 	if err != nil {
 		return nil, err
@@ -87,7 +87,7 @@ func (p *parser) term() (Expr, error) {
 	return expr, nil
 }
 
-func (p *parser) factor() (Expr, error) {
+func (p *Parser) factor() (Expr, error) {
 	expr, err := p.unary()
 	if err != nil {
 		return nil, err
@@ -110,7 +110,7 @@ func (p *parser) factor() (Expr, error) {
 	return expr, nil
 }
 
-func (p *parser) unary() (Expr, error) {
+func (p *Parser) unary() (Expr, error) {
 	if p.match(Bang, Minus) {
 		operator := p.previous()
 		right, err := p.unary()
@@ -128,7 +128,7 @@ func (p *parser) unary() (Expr, error) {
 	return p.primary()
 }
 
-func (p *parser) primary() (Expr, error) {
+func (p *Parser) primary() (Expr, error) {
 	if p.match(False) {
 		return Literal{false}, nil
 	}
@@ -162,7 +162,7 @@ func (p *parser) primary() (Expr, error) {
 	return nil, p.error(p.peek(), "expected expression.")
 }
 
-func (p *parser) match(types ...TokenType) bool {
+func (p *Parser) match(types ...TokenType) bool {
 	for _, t := range types {
 		if p.check(t) {
 			p.advance()
@@ -173,7 +173,7 @@ func (p *parser) match(types ...TokenType) bool {
 	return false
 }
 
-func (p *parser) check(t TokenType) bool {
+func (p *Parser) check(t TokenType) bool {
 	if p.isAtEnd() {
 		return false
 	}
@@ -181,7 +181,7 @@ func (p *parser) check(t TokenType) bool {
 	return p.peek().Kind == t
 }
 
-func (p *parser) advance() Token {
+func (p *Parser) advance() Token {
 	if !p.isAtEnd() {
 		p.current++
 	}
@@ -189,19 +189,19 @@ func (p *parser) advance() Token {
 	return p.previous()
 }
 
-func (p *parser) isAtEnd() bool {
+func (p *Parser) isAtEnd() bool {
 	return p.peek().Kind == EOF
 }
 
-func (p *parser) peek() Token {
+func (p *Parser) peek() Token {
 	return p.tokens[p.current]
 }
 
-func (p *parser) previous() Token {
+func (p *Parser) previous() Token {
 	return p.tokens[p.current-1]
 }
 
-func (p *parser) consume(t TokenType, message string) (Token, error) {
+func (p *Parser) consume(t TokenType, message string) (Token, error) {
 	if p.check(t) {
 		return p.advance(), nil
 	}
@@ -209,7 +209,7 @@ func (p *parser) consume(t TokenType, message string) (Token, error) {
 	return Token{}, p.error(p.peek(), message)
 }
 
-func (p *parser) synchronize() {
+func (p *Parser) synchronize() {
 	p.advance()
 
 	for !p.isAtEnd() {
@@ -233,7 +233,7 @@ func (p *parser) synchronize() {
 	p.advance()
 }
 
-func (p *parser) error(t Token, message string) error {
+func (p *Parser) error(t Token, message string) error {
 	if t.Kind == EOF {
 		return &loxError{t.Line, fmt.Sprintf("at end: %s", message)}
 	}

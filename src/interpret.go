@@ -25,7 +25,7 @@ func evaluateLiteral(l *Literal) (Literal, error) {
 }
 
 func evaluateGrouping(g *Grouping) (Literal, error) {
-	return Evaluate(g)
+	return Evaluate(g.Expression)
 }
 
 func evaluateBinary(b *Binary) (Literal, error) {
@@ -77,7 +77,7 @@ func evaluateBinary(b *Binary) (Literal, error) {
 			}
 		}
 
-		return Literal{}, &loxRuntimeError{operator, "operands must be two numbers or two strings"}
+		return Literal{}, loxRuntimeError{operator, "operands must be two numbers or two strings"}
 	case Greater:
 		if l, ok := left.Value.(float64); ok {
 			if r, ok := right.Value.(float64); ok {
@@ -192,3 +192,5 @@ type loxRuntimeError struct {
 func (e loxRuntimeError) Error() string {
 	return fmt.Sprintf("[line %d] %s", e.token.Line, e.message)
 }
+
+func (e loxRuntimeError) IsLoxLanguageError() {}
