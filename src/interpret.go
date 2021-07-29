@@ -8,7 +8,7 @@ import (
 func Evaluate(e Expr) (Literal, error) {
 	switch expr := e.(type) {
 	case Literal:
-		return expr, nil
+		return evaluateLiteral(&expr)
 	case Grouping:
 		return evaluateGrouping(&expr)
 	case Unary:
@@ -18,6 +18,10 @@ func Evaluate(e Expr) (Literal, error) {
 	}
 
 	panic(fmt.Sprintf("unhandled expression type %+v", e))
+}
+
+func evaluateLiteral(l *Literal) (Literal, error) {
+	return *l, nil
 }
 
 func evaluateGrouping(g *Grouping) (Literal, error) {
