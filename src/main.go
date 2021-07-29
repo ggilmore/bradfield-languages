@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -14,86 +15,71 @@ const (
 	ExRuntime = 70
 )
 
-var (
-	hadError        bool
-	hadRuntimeError bool
-)
-
 func main() {
 	if len(os.Args) > 2 {
 		fmt.Fprintln(os.Stderr, "Usage: jlox [script]")
 		os.Exit(ExUsage)
 	}
 
-	var err error
-
 	if len(os.Args) == 2 {
 		file := os.Args[1]
-		err = runFile(file)
+		runFile(file)
 	} else {
-		err = runPrompt(os.Stdin)
-	}
-
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-
-		switch err.(type) {
-		case loxError:
-			os.Exit(ExLox)
-
-		case loxRuntimeError:
-			os.Exit(ExRuntime)
-		}
-
-		os.Exit(1)
+		runPrompt(os.Stdin)
 	}
 }
 
-func runFile(path string) error {
+func runFile(path string) {
 	f, err := os.Open(path)
 	if err != nil {
-		return fmt.Errorf("while opening source file %q: %w", path, err)
+		fmt.Fprintf(os.Stdout, "opening %q: %s\n", path, err)
+		die(err)
 	}
 
 	err = run(f)
 	if err != nil {
-		return fmt.Errorf("while running source file %q: %w", path, err)
+		fmt.Fprintf(os.Stdout, "running %q: %s\n", path, err)
+		die(err)
 	}
-
-	return nil
 }
 
-func runPrompt(r io.Reader) error {
+func runPrompt(r io.Reader) {
 	s := bufio.NewScanner(r)
 
-	fmt.Print("> ")
+	prompt := "> "
+	fmt.Print(prompt)
+
 	for s.Scan() {
 		line := s.Text()
 
 		err := run(strings.NewReader(line))
 		if err != nil {
-			return fmt.Errorf("while processing source line %s", err)
+			fmt.Fprintln(os.Stderr, err.Error())
+
+			var runErr loxRuntimeError
+			if !errors.As(err, &runErr) {
+				die(err)
+			}
 		}
 
-		fmt.Printf("\n> ")
+		fmt.Printf("\n%s", prompt)
 	}
 
 	if err := s.Err(); err != nil {
-		return fmt.Errorf("while processing input: %s", err)
+		fmt.Fprintf(os.Stderr, "while processing input: %s\n", err)
+		die(err)
 	}
-
-	return nil
 }
 
 func run(r io.Reader) error {
 	s, err := NewScanner(r)
 	if err != nil {
-		return fmt.Errorf("while intializing scanner: %w", err)
+		return fmt.Errorf("intializing scanner: %w", err)
 	}
 
 	tokens, err := s.ScanTokens()
 	if err != nil {
-		return fmt.Errorf("while scanning for tokens: %w", err)
+		return fmt.Errorf("scanning for tokens: %w", err)
 	}
 
 	p := NewParser(tokens)
@@ -108,8 +94,21 @@ func run(r io.Reader) error {
 	}
 
 	fmt.Println(expr)
-
 	return nil
+}
+
+func die(e error) {
+	var runErr loxRuntimeError
+	if errors.As(e, &runErr) {
+		os.Exit(ExRuntime)
+	}
+
+	var loxErr loxError
+	if errors.As(e, &loxErr) {
+		os.Exit(ExLox)
+	}
+
+	os.Exit(1)
 }
 
 type loxError struct {
@@ -119,13 +118,4 @@ type loxError struct {
 
 func (e loxError) Error() string {
 	return fmt.Sprintf("[line %d] Error: %s", e.line, e.message)
-}
-
-func NewLoxError(line int, message string) error {
-	hadError = true
-
-	return &loxError{
-		line,
-		message,
-	}
 }

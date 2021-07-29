@@ -235,9 +235,8 @@ func (p *parser) synchronize() {
 
 func (p *parser) error(t Token, message string) error {
 	if t.Kind == EOF {
-		return NewLoxError(t.Line, fmt.Sprintf("at end: %s", message))
+		return &loxError{t.Line, fmt.Sprintf("at end: %s", message)}
 	}
 
-	return NewLoxError(t.Line, fmt.Sprintf("at %s end: %s", t.Lexeme, message))
-
+	return &loxError{t.Line, fmt.Sprintf("at %q: %s", t.Lexeme, message)}
 }

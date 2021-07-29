@@ -38,46 +38,45 @@ func (s *Scanner) ScanTokens() ([]Token, error) {
 		s.scanToken()
 	}
 
-	s.tokens = append(s.tokens, Token{EOF, "", nil, s.line})
+	eof := Token{EOF, "", nil, s.line}
+	s.tokens = append(s.tokens, eof)
 
 	return s.tokens, s.errs.ErrorOrNil()
 }
 
 func (s *Scanner) scanToken() {
-
 	c := s.advance()
 
 	switch c {
 	case '(':
 		s.addToken(LeftParen)
-		break
+
 	case ')':
 		s.addToken(RightParen)
-		break
+
 	case '{':
 		s.addToken(LeftBrace)
-		break
+
 	case '}':
 		s.addToken(RightBrace)
-		break
+
 	case ',':
 		s.addToken(Comma)
-		break
+
 	case '.':
 		s.addToken(Dot)
-		break
+
 	case '-':
 		s.addToken(Minus)
-		break
+
 	case '+':
 		s.addToken(Plus)
-		break
+
 	case ';':
 		s.addToken(Semicolon)
-		break
+
 	case '*':
 		s.addToken(Star)
-		break
 
 	case '!':
 		kind := Bang
@@ -86,7 +85,6 @@ func (s *Scanner) scanToken() {
 		}
 
 		s.addToken(kind)
-		break
 
 	case '=':
 		kind := Equal
@@ -95,7 +93,6 @@ func (s *Scanner) scanToken() {
 		}
 
 		s.addToken(kind)
-		break
 
 	case '<':
 		kind := Less
@@ -104,7 +101,6 @@ func (s *Scanner) scanToken() {
 		}
 
 		s.addToken(kind)
-		break
 
 	case '>':
 		kind := Greater
@@ -113,7 +109,6 @@ func (s *Scanner) scanToken() {
 		}
 
 		s.addToken(kind)
-		break
 
 	case '/':
 		if s.match('/') {
@@ -123,7 +118,6 @@ func (s *Scanner) scanToken() {
 		} else {
 			s.addToken(Slash)
 		}
-		break
 
 	case ' ':
 	case '\r':
@@ -132,11 +126,9 @@ func (s *Scanner) scanToken() {
 
 	case '\n':
 		s.line++
-		break
 
 	case '"':
 		s.string()
-		break
 
 	default:
 		if s.isDigit(c) {
@@ -144,10 +136,9 @@ func (s *Scanner) scanToken() {
 		} else if s.isAlpha(c) {
 			s.identifier()
 		} else {
-			s.errs = multierror.Append(s.errs, NewLoxError(s.line, fmt.Sprintf("Unexpected character %q.", c)))
+			err := loxError{s.line, fmt.Sprintf("Unexpected character %q.", c)}
+			s.errs = multierror.Append(s.errs, err)
 		}
-
-		break
 
 	}
 
@@ -177,7 +168,7 @@ func (s *Scanner) string() {
 	}
 
 	if s.isAtEnd() {
-		e := NewLoxError(s.line, "Unterminated string.")
+		e := loxError{s.line, "Unterminated string."}
 		s.errs = multierror.Append(s.errs, e)
 
 		return

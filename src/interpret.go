@@ -10,116 +10,134 @@ func Evaluate(e Expr) (Literal, error) {
 	case Literal:
 		return expr, nil
 	case Grouping:
-		return Evaluate(expr.Expression)
+		return evaluateGrouping(&expr)
 	case Unary:
-		right, err := Evaluate(expr.Right)
-		if err != nil {
-			return Literal{}, err
-		}
-
-		switch expr.Operator.Kind {
-		case Minus:
-			n, ok := right.Value.(float64)
-			if !ok {
-				return Literal{}, NaNError(expr.Operator, right)
-			}
-
-			return Literal{-n}, nil
-
-		case Bang:
-			return Literal{!isTruthy(right.Value)}, nil
-		}
-
+		return evaluateUnary(&expr)
 	case Binary:
-		left, err := Evaluate(expr.Left)
-		if err != nil {
-			return Literal{}, err
-		}
-
-		right, err := Evaluate(expr.Right)
-		if err != nil {
-			return Literal{}, err
-		}
-
-		operator := expr.Operator
-
-		switch operator.Kind {
-		case Minus:
-			if l, ok := left.Value.(float64); ok {
-				if r, ok := right.Value.(float64); ok {
-					return Literal{l - r}, nil
-				}
-			}
-
-			return Literal{}, NaNError(operator, left)
-		case Slash:
-			if l, ok := left.Value.(float64); ok {
-				if r, ok := right.Value.(float64); ok {
-					return Literal{l / r}, nil
-				}
-			}
-
-			return Literal{}, NaNError(operator, left, right)
-		case Star:
-			if l, ok := left.Value.(float64); ok {
-				if r, ok := right.Value.(float64); ok {
-					return Literal{l * r}, nil
-				}
-			}
-
-			return Literal{}, NaNError(operator, left, right)
-		case Plus:
-			if l, ok := left.Value.(float64); ok {
-				if r, ok := right.Value.(float64); ok {
-					return Literal{l + r}, nil
-				}
-			} else if l, ok := left.Value.(string); ok {
-				if r, ok := right.Value.(string); ok {
-					return Literal{l + r}, nil
-				}
-			}
-
-			return Literal{}, &loxRuntimeError{operator, "Operands must be two numbers or two strings"}
-		case Greater:
-			if l, ok := left.Value.(float64); ok {
-				if r, ok := right.Value.(float64); ok {
-					return Literal{l > r}, nil
-				}
-			}
-
-			return Literal{}, NaNError(operator, left, right)
-		case GreaterEqual:
-			if l, ok := left.Value.(float64); ok {
-				if r, ok := right.Value.(float64); ok {
-					return Literal{l >= r}, nil
-				}
-			}
-
-			return Literal{}, NaNError(operator, left, right)
-		case Less:
-			if l, ok := left.Value.(float64); ok {
-				if r, ok := right.Value.(float64); ok {
-					return Literal{l < r}, nil
-				}
-			}
-
-			return Literal{}, NaNError(operator, left, right)
-		case LessEqual:
-			if l, ok := left.Value.(float64); ok {
-				if r, ok := right.Value.(float64); ok {
-					return Literal{l <= r}, nil
-				}
-			}
-
-			return Literal{}, NaNError(operator, left, right)
-		case BangEqual:
-			return Literal{!isEqual(left.Value, right.Value)}, nil
-		case EqualEqual:
-			return Literal{isEqual(left.Value, right.Value)}, nil
-		}
+		return evaluateBinary(&expr)
 	}
 
 	panic(fmt.Sprintf("unhandled expression type %+v", e))
+}
+
+func evaluateGrouping(g *Grouping) (Literal, error) {
+	return Evaluate(g)
+}
+
+func evaluateBinary(b *Binary) (Literal, error) {
+	left, err := Evaluate(b.Left)
+	if err != nil {
+		return Literal{}, err
+	}
+
+	right, err := Evaluate(b.Right)
+	if err != nil {
+		return Literal{}, err
+	}
+
+	operator := b.Operator
+
+	switch operator.Kind {
+	case Minus:
+		if l, ok := left.Value.(float64); ok {
+			if r, ok := right.Value.(float64); ok {
+				return Literal{l - r}, nil
+			}
+		}
+
+		return Literal{}, NaNError(operator, left)
+	case Slash:
+		if l, ok := left.Value.(float64); ok {
+			if r, ok := right.Value.(float64); ok {
+				return Literal{l / r}, nil
+			}
+		}
+
+		return Literal{}, NaNError(operator, left, right)
+	case Star:
+		if l, ok := left.Value.(float64); ok {
+			if r, ok := right.Value.(float64); ok {
+				return Literal{l * r}, nil
+			}
+		}
+
+		return Literal{}, NaNError(operator, left, right)
+	case Plus:
+		if l, ok := left.Value.(float64); ok {
+			if r, ok := right.Value.(float64); ok {
+				return Literal{l + r}, nil
+			}
+		} else if l, ok := left.Value.(string); ok {
+			if r, ok := right.Value.(string); ok {
+				return Literal{l + r}, nil
+			}
+		}
+
+		return Literal{}, &loxRuntimeError{operator, "operands must be two numbers or two strings"}
+	case Greater:
+		if l, ok := left.Value.(float64); ok {
+			if r, ok := right.Value.(float64); ok {
+				return Literal{l > r}, nil
+			}
+		}
+
+		return Literal{}, NaNError(operator, left, right)
+	case GreaterEqual:
+		if l, ok := left.Value.(float64); ok {
+			if r, ok := right.Value.(float64); ok {
+				return Literal{l >= r}, nil
+			}
+		}
+
+		return Literal{}, NaNError(operator, left, right)
+	case Less:
+		if l, ok := left.Value.(float64); ok {
+			if r, ok := right.Value.(float64); ok {
+				return Literal{l < r}, nil
+			}
+		}
+
+		return Literal{}, NaNError(operator, left, right)
+	case LessEqual:
+		if l, ok := left.Value.(float64); ok {
+			if r, ok := right.Value.(float64); ok {
+				return Literal{l <= r}, nil
+			}
+		}
+
+		return Literal{}, NaNError(operator, left, right)
+	case BangEqual:
+		return Literal{!isEqual(left.Value, right.Value)}, nil
+	case EqualEqual:
+		return Literal{isEqual(left.Value, right.Value)}, nil
+	default:
+		panic(fmt.Sprintf("unhandled binary operator: %s", operator))
+	}
+}
+
+func evaluateUnary(u *Unary) (Literal, error) {
+	right, err := Evaluate(u.Right)
+	if err != nil {
+		return Literal{}, err
+	}
+
+	operator := u.Operator
+
+	switch operator.Kind {
+	case Minus:
+		n, ok := right.Value.(float64)
+		if !ok {
+			return Literal{}, NaNError(operator, right)
+		}
+
+		return Literal{-n}, nil
+
+	case Bang:
+		return Literal{!isTruthy(right.Value)}, nil
+
+	default:
+		panic(fmt.Sprintf("unhandled unary operator: %s", operator))
+	}
 }
 
 func isEqual(x, y interface{}) bool {
@@ -146,7 +164,7 @@ func isTruthy(candidate interface{}) bool {
 	return true
 }
 
-func NaNError(operator Token, operandA Expr, rest ...Expr) *loxRuntimeError {
+func NaNError(operator Token, operandA Expr, rest ...Expr) error {
 	message := fmt.Sprintf("operand %s must be a number", operandA.String())
 	if len(rest) > 0 {
 		operands := append([]Expr{operandA}, rest...)
@@ -156,17 +174,10 @@ func NaNError(operator Token, operandA Expr, rest ...Expr) *loxRuntimeError {
 			operandStrings = append(operandStrings, operand.String())
 		}
 
-		message = fmt.Sprintf("operands %s must all be numbers", strings.Join(operandStrings, ","))
+		message = fmt.Sprintf("operands %s must all be numbers", strings.Join(operandStrings, ", "))
 	}
 
-	return NewLoxRuntimeError(operator, message)
-
-}
-
-func NewLoxRuntimeError(token Token, message string) *loxRuntimeError {
-	hadRuntimeError = true
-
-	return &loxRuntimeError{token, message}
+	return loxRuntimeError{operator, message}
 }
 
 type loxRuntimeError struct {
@@ -175,5 +186,5 @@ type loxRuntimeError struct {
 }
 
 func (e loxRuntimeError) Error() string {
-	return fmt.Sprintf("%s\n[line %d]", e.message, e.token.Line)
+	return fmt.Sprintf("[line %d] %s", e.token.Line, e.message)
 }
