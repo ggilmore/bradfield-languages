@@ -18,7 +18,7 @@ generate:
     ./ast_generator/generate.sh
 
 go-build:
-    ./src/build.sh
+    ./glox/build.sh
 
 gofmt: format-golang
 format-golang:

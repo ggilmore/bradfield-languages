@@ -16,6 +16,41 @@ func (p *Parser) Parse() (Expr, error) {
 }
 
 func (p *Parser) expression() (Expr, error) {
+	return p.assignment()
+}
+
+func (p *Parser) assignment() (Expr, error) {
+	if p.match(KindLet) {
+		if p.match(KindIdentifier) {
+			identifier := p.previous()
+			if p.match(KindEqual) {
+				init, err := p.assignment()
+				if err != nil {
+					return nil, err
+				}
+
+				if p.match(KindIn) {
+					body, err := p.assignment()
+					if err != nil {
+						return nil, err
+					}
+
+					return Let{
+						Identifier: identifier,
+						Init:       init,
+						Body:       body,
+					}, nil
+				}
+
+				return nil, p.error(p.peek(), "expected 'in'")
+			}
+
+			return nil, p.error(p.peek(), "expected '='")
+		}
+
+		return nil, p.error(p.peek(), "expected identifier")
+	}
+
 	return p.equality()
 }
 
@@ -25,7 +60,7 @@ func (p *Parser) equality() (Expr, error) {
 		return nil, err
 	}
 
-	for p.match(BangEqual, EqualEqual) {
+	for p.match(KindBangEqual, KindEqualEqual) {
 		operator := p.previous()
 		right, err := p.comparsion()
 		if err != nil {
@@ -48,7 +83,7 @@ func (p *Parser) comparsion() (Expr, error) {
 		return nil, err
 	}
 
-	for p.match(Greater, GreaterEqual, Less, LessEqual) {
+	for p.match(KindGreater, KindGreaterEqual, KindLess, KindLessEqual) {
 		operator := p.previous()
 		right, err := p.term()
 		if err != nil {
@@ -70,7 +105,7 @@ func (p *Parser) term() (Expr, error) {
 		return nil, err
 	}
 
-	for p.match(Minus, Plus) {
+	for p.match(KindMinus, KindPlus) {
 		operator := p.previous()
 		right, err := p.factor()
 		if err != nil {
@@ -93,7 +128,7 @@ func (p *Parser) factor() (Expr, error) {
 		return nil, err
 	}
 
-	for p.match(Slash, Star) {
+	for p.match(KindSlash, KindStar) {
 		operator := p.previous()
 		right, err := p.unary()
 		if err != nil {
@@ -111,7 +146,7 @@ func (p *Parser) factor() (Expr, error) {
 }
 
 func (p *Parser) unary() (Expr, error) {
-	if p.match(Bang, Minus) {
+	if p.match(KindBang, KindMinus) {
 		operator := p.previous()
 		right, err := p.unary()
 		if err != nil {
@@ -122,34 +157,37 @@ func (p *Parser) unary() (Expr, error) {
 			Operator: operator,
 			Right:    right,
 		}, nil
-
 	}
 
 	return p.primary()
 }
 
 func (p *Parser) primary() (Expr, error) {
-	if p.match(False) {
+	if p.match(KindFalse) {
 		return Literal{false}, nil
 	}
-	if p.match(True) {
+	if p.match(KindTrue) {
 		return Literal{true}, nil
 	}
-	if p.match(Nil) {
+	if p.match(KindNil) {
 		return Literal{nil}, nil
 	}
 
-	if p.match(Number, String) {
+	if p.match(KindNumber, KindString) {
 		return Literal{p.previous().Literal}, nil
 	}
 
-	if p.match(LeftParen) {
+	if p.match(KindIdentifier) {
+		return Variable{p.previous()}, nil
+	}
+
+	if p.match(KindLeftParen) {
 		expr, err := p.expression()
 		if err != nil {
 			return nil, err
 		}
 
-		_, err = p.consume(RightParen, "expect ) after expression.")
+		_, err = p.consume(KindRightParen, "expect ) after expression.")
 		if err != nil {
 			return nil, err
 		}
@@ -162,7 +200,7 @@ func (p *Parser) primary() (Expr, error) {
 	return nil, p.error(p.peek(), "expected expression.")
 }
 
-func (p *Parser) match(types ...TokenType) bool {
+func (p *Parser) match(types ...TokenKind) bool {
 	for _, t := range types {
 		if p.check(t) {
 			p.advance()
@@ -173,7 +211,7 @@ func (p *Parser) match(types ...TokenType) bool {
 	return false
 }
 
-func (p *Parser) check(t TokenType) bool {
+func (p *Parser) check(t TokenKind) bool {
 	if p.isAtEnd() {
 		return false
 	}
@@ -190,7 +228,7 @@ func (p *Parser) advance() Token {
 }
 
 func (p *Parser) isAtEnd() bool {
-	return p.peek().Kind == EOF
+	return p.peek().Kind == KindEOF
 }
 
 func (p *Parser) peek() Token {
@@ -201,7 +239,7 @@ func (p *Parser) previous() Token {
 	return p.tokens[p.current-1]
 }
 
-func (p *Parser) consume(t TokenType, message string) (Token, error) {
+func (p *Parser) consume(t TokenKind, message string) (Token, error) {
 	if p.check(t) {
 		return p.advance(), nil
 	}
@@ -213,20 +251,20 @@ func (p *Parser) synchronize() {
 	p.advance()
 
 	for !p.isAtEnd() {
-		if p.previous().Kind == Semicolon {
+		if p.previous().Kind == KindSemicolon {
 			return
 		}
 	}
 
 	switch p.peek().Kind {
-	case Class:
-	case Fun:
-	case Var:
-	case For:
-	case If:
-	case While:
-	case Print:
-	case Return:
+	case KindClass:
+	case KindFun:
+	case KindVar:
+	case KindFor:
+	case KindIf:
+	case KindWhile:
+	case KindPrint:
+	case KindReturn:
 		return
 	}
 
@@ -234,7 +272,7 @@ func (p *Parser) synchronize() {
 }
 
 func (p *Parser) error(t Token, message string) error {
-	if t.Kind == EOF {
+	if t.Kind == KindEOF {
 		return &loxError{t.Line, fmt.Sprintf("at end: %s", message)}
 	}
 

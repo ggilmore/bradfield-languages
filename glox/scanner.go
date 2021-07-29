@@ -38,7 +38,7 @@ func (s *Scanner) ScanTokens() ([]Token, error) {
 		s.scanToken()
 	}
 
-	eof := Token{EOF, "", nil, s.line}
+	eof := Token{KindEOF, "", nil, s.line}
 	s.tokens = append(s.tokens, eof)
 
 	return s.tokens, s.errs.ErrorOrNil()
@@ -49,63 +49,63 @@ func (s *Scanner) scanToken() {
 
 	switch c {
 	case '(':
-		s.addToken(LeftParen)
+		s.addToken(KindLeftParen)
 
 	case ')':
-		s.addToken(RightParen)
+		s.addToken(KindRightParen)
 
 	case '{':
-		s.addToken(LeftBrace)
+		s.addToken(KindLeftBrace)
 
 	case '}':
-		s.addToken(RightBrace)
+		s.addToken(KindRightBrace)
 
 	case ',':
-		s.addToken(Comma)
+		s.addToken(KindComma)
 
 	case '.':
-		s.addToken(Dot)
+		s.addToken(KindDot)
 
 	case '-':
-		s.addToken(Minus)
+		s.addToken(KindMinus)
 
 	case '+':
-		s.addToken(Plus)
+		s.addToken(KindPlus)
 
 	case ';':
-		s.addToken(Semicolon)
+		s.addToken(KindSemicolon)
 
 	case '*':
-		s.addToken(Star)
+		s.addToken(KindStar)
 
 	case '!':
-		kind := Bang
+		kind := KindBang
 		if s.match('=') {
-			kind = BangEqual
+			kind = KindBangEqual
 		}
 
 		s.addToken(kind)
 
 	case '=':
-		kind := Equal
+		kind := KindEqual
 		if s.match('=') {
-			kind = EqualEqual
+			kind = KindEqualEqual
 		}
 
 		s.addToken(kind)
 
 	case '<':
-		kind := Less
+		kind := KindLess
 		if s.match('=') {
-			kind = LessEqual
+			kind = KindLessEqual
 		}
 
 		s.addToken(kind)
 
 	case '>':
-		kind := Greater
+		kind := KindGreater
 		if s.match('=') {
-			kind = GreaterEqual
+			kind = KindGreaterEqual
 		}
 
 		s.addToken(kind)
@@ -116,7 +116,7 @@ func (s *Scanner) scanToken() {
 				s.advance()
 			}
 		} else {
-			s.addToken(Slash)
+			s.addToken(KindSlash)
 		}
 
 	case ' ':
@@ -150,7 +150,7 @@ func (s *Scanner) identifier() {
 	text := string(s.input[s.start:s.current])
 	kind, isKeyword := Keywords[text]
 	if !isKeyword {
-		kind = Identifier
+		kind = KindIdentifier
 	}
 
 	s.addToken(kind)
@@ -176,7 +176,7 @@ func (s *Scanner) string() {
 	s.advance()
 
 	v := string(s.input[s.start+1 : s.current-1])
-	s.addTokenLiteral(String, v)
+	s.addTokenLiteral(KindString, v)
 }
 
 func (s *Scanner) number() {
@@ -201,7 +201,7 @@ func (s *Scanner) number() {
 		panic(fmt.Errorf("when parsing float - unable to convert %q to float64: %s", v, err))
 	}
 
-	s.addTokenLiteral(Number, f)
+	s.addTokenLiteral(KindNumber, f)
 }
 
 func (s *Scanner) isAlphaNumeric(c rune) bool {
@@ -254,11 +254,11 @@ func (s *Scanner) peekNext() rune {
 	return s.input[s.current+1]
 }
 
-func (s *Scanner) addToken(kind TokenType) {
+func (s *Scanner) addToken(kind TokenKind) {
 	s.addTokenLiteral(kind, nil)
 }
 
-func (s *Scanner) addTokenLiteral(kind TokenType, literal interface{}) {
+func (s *Scanner) addTokenLiteral(kind TokenKind, literal interface{}) {
 	s.tokens = append(s.tokens, Token{
 		Kind: kind,
 

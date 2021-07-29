@@ -6,35 +6,74 @@ import (
 )
 
 func Evaluate(e Expr) (Literal, error) {
+	return evaluateWith(e, NewScope(nil))
+}
+
+func evaluateWith(e Expr, s *Scope) (Literal, error) {
 	switch expr := e.(type) {
 	case Literal:
 		return evaluateLiteral(&expr)
+	case Variable:
+		return evaluateVariable(&expr, s)
 	case Grouping:
-		return evaluateGrouping(&expr)
+		return evaluateGrouping(&expr, s)
 	case Unary:
-		return evaluateUnary(&expr)
+		return evaluateUnary(&expr, s)
 	case Binary:
-		return evaluateBinary(&expr)
+		return evaluateBinary(&expr, s)
+	case Let:
+		return evaluateLet(&expr, s)
 	}
 
 	panic(fmt.Sprintf("unhandled expression type %+v", e))
+}
+
+func evaluateLet(l *Let, scope *Scope) (Literal, error) {
+	scope = NewScope(scope)
+
+	key := l.Identifier.Lexeme
+	value := l.Init
+	scope.Insert(key, value)
+
+	return evaluateWith(l.Body, scope)
+}
+
+func evaluateVariable(v *Variable, scope *Scope) (Literal, error) {
+	key := v.Identifier.Lexeme
+
+	for ; scope != nil; scope = scope.Parent {
+		rawValue, found := scope.Lookup(key)
+		if !found {
+			continue
+		}
+
+		value, err := evaluateWith(rawValue, scope)
+		if err != nil {
+			return Literal{}, err
+		}
+
+		scope.Insert(key, value)
+		return value, nil
+	}
+
+	return Literal{}, loxRuntimeError{v.Identifier, fmt.Sprintf("undefined variable %q", key)}
 }
 
 func evaluateLiteral(l *Literal) (Literal, error) {
 	return *l, nil
 }
 
-func evaluateGrouping(g *Grouping) (Literal, error) {
-	return Evaluate(g.Expression)
+func evaluateGrouping(g *Grouping, s *Scope) (Literal, error) {
+	return evaluateWith(g.Expression, s)
 }
 
-func evaluateBinary(b *Binary) (Literal, error) {
-	left, err := Evaluate(b.Left)
+func evaluateBinary(b *Binary, s *Scope) (Literal, error) {
+	left, err := evaluateWith(b.Left, s)
 	if err != nil {
 		return Literal{}, err
 	}
 
-	right, err := Evaluate(b.Right)
+	right, err := evaluateWith(b.Right, s)
 	if err != nil {
 		return Literal{}, err
 	}
@@ -42,7 +81,7 @@ func evaluateBinary(b *Binary) (Literal, error) {
 	operator := b.Operator
 
 	switch operator.Kind {
-	case Minus:
+	case KindMinus:
 		if l, ok := left.Value.(float64); ok {
 			if r, ok := right.Value.(float64); ok {
 				return Literal{l - r}, nil
@@ -50,7 +89,7 @@ func evaluateBinary(b *Binary) (Literal, error) {
 		}
 
 		return Literal{}, NaNError(operator, left)
-	case Slash:
+	case KindSlash:
 		if l, ok := left.Value.(float64); ok {
 			if r, ok := right.Value.(float64); ok {
 				return Literal{l / r}, nil
@@ -58,7 +97,7 @@ func evaluateBinary(b *Binary) (Literal, error) {
 		}
 
 		return Literal{}, NaNError(operator, left, right)
-	case Star:
+	case KindStar:
 		if l, ok := left.Value.(float64); ok {
 			if r, ok := right.Value.(float64); ok {
 				return Literal{l * r}, nil
@@ -66,7 +105,7 @@ func evaluateBinary(b *Binary) (Literal, error) {
 		}
 
 		return Literal{}, NaNError(operator, left, right)
-	case Plus:
+	case KindPlus:
 		if l, ok := left.Value.(float64); ok {
 			if r, ok := right.Value.(float64); ok {
 				return Literal{l + r}, nil
@@ -78,7 +117,7 @@ func evaluateBinary(b *Binary) (Literal, error) {
 		}
 
 		return Literal{}, loxRuntimeError{operator, "operands must be two numbers or two strings"}
-	case Greater:
+	case KindGreater:
 		if l, ok := left.Value.(float64); ok {
 			if r, ok := right.Value.(float64); ok {
 				return Literal{l > r}, nil
@@ -86,7 +125,7 @@ func evaluateBinary(b *Binary) (Literal, error) {
 		}
 
 		return Literal{}, NaNError(operator, left, right)
-	case GreaterEqual:
+	case KindGreaterEqual:
 		if l, ok := left.Value.(float64); ok {
 			if r, ok := right.Value.(float64); ok {
 				return Literal{l >= r}, nil
@@ -94,7 +133,7 @@ func evaluateBinary(b *Binary) (Literal, error) {
 		}
 
 		return Literal{}, NaNError(operator, left, right)
-	case Less:
+	case KindLess:
 		if l, ok := left.Value.(float64); ok {
 			if r, ok := right.Value.(float64); ok {
 				return Literal{l < r}, nil
@@ -102,7 +141,7 @@ func evaluateBinary(b *Binary) (Literal, error) {
 		}
 
 		return Literal{}, NaNError(operator, left, right)
-	case LessEqual:
+	case KindLessEqual:
 		if l, ok := left.Value.(float64); ok {
 			if r, ok := right.Value.(float64); ok {
 				return Literal{l <= r}, nil
@@ -110,17 +149,17 @@ func evaluateBinary(b *Binary) (Literal, error) {
 		}
 
 		return Literal{}, NaNError(operator, left, right)
-	case BangEqual:
+	case KindBangEqual:
 		return Literal{!isEqual(left.Value, right.Value)}, nil
-	case EqualEqual:
+	case KindEqualEqual:
 		return Literal{isEqual(left.Value, right.Value)}, nil
 	default:
 		panic(fmt.Sprintf("unhandled binary operator: %s", operator))
 	}
 }
 
-func evaluateUnary(u *Unary) (Literal, error) {
-	right, err := Evaluate(u.Right)
+func evaluateUnary(u *Unary, s *Scope) (Literal, error) {
+	right, err := evaluateWith(u.Right, s)
 	if err != nil {
 		return Literal{}, err
 	}
@@ -128,7 +167,7 @@ func evaluateUnary(u *Unary) (Literal, error) {
 	operator := u.Operator
 
 	switch operator.Kind {
-	case Minus:
+	case KindMinus:
 		n, ok := right.Value.(float64)
 		if !ok {
 			return Literal{}, NaNError(operator, right)
@@ -136,7 +175,7 @@ func evaluateUnary(u *Unary) (Literal, error) {
 
 		return Literal{-n}, nil
 
-	case Bang:
+	case KindBang:
 		return Literal{!isTruthy(right.Value)}, nil
 
 	default:

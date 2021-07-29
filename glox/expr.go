@@ -8,20 +8,8 @@ import (
 	"github.com/kr/pretty"
 )
 
-// It seems odd to use this pattern in go, especially given this comment:
-// https://groups.google.com/g/golang-nuts/c/3fOIZ1VLn1o/m/GeE1z5qUA6YJ
-// I'm gonna keep using it though so as to not diverge from the book too far.
-
-type Visitor interface {
-	visitBinary(Binary) error
-	visitGrouping(Grouping) error
-	visitLiteral(Literal) error
-	visitUnary(Unary) error
-}
-
 type Expr interface {
 	isExpr()
-	Accept(Visitor) error
 	String() string
 }
 
@@ -31,9 +19,6 @@ type Binary struct {
 	Operator Token
 }
 
-func (b Binary) Accept(v Visitor) error {
-	return v.visitBinary(b)
-}
 func (b Binary) String() string {
 	return pretty.Sprint(b)
 }
@@ -42,9 +27,6 @@ type Grouping struct {
 	Expression Expr
 }
 
-func (g Grouping) Accept(v Visitor) error {
-	return v.visitGrouping(g)
-}
 func (g Grouping) String() string {
 	return pretty.Sprint(g)
 }
@@ -53,9 +35,6 @@ type Literal struct {
 	Value interface{}
 }
 
-func (l Literal) Accept(v Visitor) error {
-	return v.visitLiteral(l)
-}
 func (l Literal) String() string {
 	if l.Value == nil {
 		return "nil"
@@ -73,14 +52,31 @@ type Unary struct {
 	Right    Expr
 }
 
-func (u Unary) Accept(v Visitor) error {
-	return v.visitUnary(u)
-}
 func (u Unary) String() string {
 	return pretty.Sprint(u)
+}
+
+type Variable struct {
+	Identifier Token
+}
+
+func (v Variable) String() string {
+	return fmt.Sprintf("Variable{%s}", v.Identifier)
+}
+
+type Let struct {
+	Identifier Token
+	Init       Expr
+	Body       Expr
+}
+
+func (l Let) String() string {
+	return pretty.Sprint(l)
 }
 
 func (b Binary) isExpr()   {}
 func (g Grouping) isExpr() {}
 func (l Literal) isExpr()  {}
 func (u Unary) isExpr()    {}
+func (l Let) isExpr()      {}
+func (v Variable) isExpr() {}
