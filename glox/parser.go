@@ -1,9 +1,15 @@
 package main
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+
+	"github.com/hashicorp/go-multierror"
+)
 
 type Parser struct {
 	tokens  []Token
+	errs    multierror.Error
 	current int
 }
 
@@ -11,8 +17,72 @@ func NewParser(tokens []Token) *Parser {
 	return &Parser{tokens: tokens}
 }
 
-func (p *Parser) Parse() (Expr, error) {
-	return p.expression()
+func (p *Parser) Parse() ([]Stmt, error) {
+	var statements []Stmt
+
+	for !p.isAtEnd() {
+		stmt, err := p.statement()
+		if err != nil {
+			return nil, err
+		}
+
+		statements = append(statements, stmt)
+	}
+
+	return statements, nil
+}
+
+func (p *Parser) declaration(Stmt, error) {
+	if p.match(KindVar) {
+
+		_, err := p.varDeclarlation()
+
+		var parseErr parseError
+		if errors.As(err, &parseErr) {
+			p.synchronize()
+			p.errs = multierror.Append(&p.errs, parseErr)
+			return
+		}
+
+	}
+
+	return p.statement()
+}
+
+func (p *Parser) statement() (Stmt, error) {
+	if p.match(KindPrint) {
+		return p.printStatement()
+	}
+
+	return p.expressionStatement()
+}
+
+func (p *Parser) printStatement() (Stmt, error) {
+	value, err := p.expression()
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = p.consume(KindSemicolon, "Expect ';' after value.")
+	if err != nil {
+		return nil, err
+	}
+
+	return Print{value}, nil
+}
+
+func (p *Parser) expressionStatement() (Stmt, error) {
+	expr, err := p.expression()
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = p.consume(KindSemicolon, "Expect ';' after expression.")
+	if err != nil {
+		return nil, err
+	}
+
+	return Expression{expr}, nil
 }
 
 func (p *Parser) expression() (Expr, error) {
@@ -272,9 +342,22 @@ func (p *Parser) synchronize() {
 }
 
 func (p *Parser) error(t Token, message string) error {
-	if t.Kind == KindEOF {
-		return &loxError{t.Line, fmt.Sprintf("at end: %s", message)}
+	return &parseError{t.Line, t, message}
+}
+
+type parseError struct {
+	line    int
+	token   Token
+	message string
+}
+
+func (e parseError) Error() string {
+	location := fmt.Sprint("%q", e.token.Lexeme)
+	if e.token.Kind == KindEOF {
+		location = "end"
 	}
 
-	return &loxError{t.Line, fmt.Sprintf("at %q: %s", t.Lexeme, message)}
+	return fmt.Sprintf("[line %d] error: at %s: %s", e.line, location, e.message)
 }
+
+func (e parseError) IsLoxLanguageError() {}

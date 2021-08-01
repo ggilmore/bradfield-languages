@@ -1,1 +1,3 @@
-let x = 50 in let y = (3 * 55) *-2 in x * y * x
+print "one";
+print true;
+print 2 + 1;

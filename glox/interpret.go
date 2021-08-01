@@ -5,75 +5,122 @@ import (
 	"strings"
 )
 
-func Evaluate(e Expr) (Literal, error) {
-	return evaluateWith(e, NewScope(nil))
+type interpreter struct {
+	statements []Stmt
+	env        *Environment
 }
 
-func evaluateWith(e Expr, s *Scope) (Literal, error) {
+func NewInterpreter(statements []Stmt) *interpreter {
+	return &interpreter{
+		statements: statements,
+		env:        NewEnvironment(nil),
+	}
+}
+
+func (i *interpreter) Interpret() error {
+	for _, s := range i.statements {
+		err := i.execute(s)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (i *interpreter) execute(s Stmt) error {
+	switch stmt := s.(type) {
+	case Print:
+		return i.printStmt(stmt)
+	case Expression:
+		return i.expressionStmt(stmt)
+	}
+
+	panic(fmt.Sprintf("unhandled statement type %+v", s))
+}
+
+func (i *interpreter) evaluate(e Expr) (Literal, error) {
 	switch expr := e.(type) {
 	case Literal:
-		return evaluateLiteral(&expr)
+		return i.literal(&expr)
 	case Variable:
-		return evaluateVariable(&expr, s)
+		return i.variable(&expr)
 	case Grouping:
-		return evaluateGrouping(&expr, s)
+		return i.grouping(&expr)
 	case Unary:
-		return evaluateUnary(&expr, s)
+		return i.unary(&expr)
 	case Binary:
-		return evaluateBinary(&expr, s)
+		return i.binary(&expr)
 	case Let:
-		return evaluateLet(&expr, s)
+		return i.let(&expr)
 	}
 
 	panic(fmt.Sprintf("unhandled expression type %+v", e))
 }
 
-func evaluateLet(l *Let, scope *Scope) (Literal, error) {
-	s := NewScope(scope)
-
-	key := l.Identifier.Lexeme
-	value := l.Init
-	s.Insert(key, value)
-
-	return evaluateWith(l.Body, s)
+func (i *interpreter) expressionStmt(e Expression) error {
+	_, err := i.evaluate(e.Expr)
+	return err
 }
 
-func evaluateVariable(v *Variable, scope *Scope) (Literal, error) {
-	key := v.Identifier.Lexeme
-
-	for ; scope != nil; scope = scope.Parent {
-		rawValue, found := scope.Lookup(key)
-		if !found {
-			continue
-		}
-
-		value, err := evaluateWith(rawValue, scope)
-		if err != nil {
-			return Literal{}, err
-		}
-
-		scope.Insert(key, value)
-		return value, nil
+func (i *interpreter) printStmt(p Print) error {
+	value, err := i.evaluate(p.Expr)
+	if err != nil {
+		return err
 	}
 
-	return Literal{}, loxRuntimeError{v.Identifier, fmt.Sprintf("undefined variable %q", key)}
+	fmt.Println(value.String())
+	return nil
 }
 
-func evaluateLiteral(l *Literal) (Literal, error) {
-	return *l, nil
+func (i *interpreter) let(l *Let) (Literal, error) {
+	originalEnv := i.env
+	defer func() {
+		i.env = originalEnv
+	}()
+
+	i.env = NewEnvironment(originalEnv)
+
+	name := l.Identifier.Lexeme
+	value := l.Init
+	i.env.Define(name, value)
+
+	return i.evaluate(l.Body)
 }
 
-func evaluateGrouping(g *Grouping, s *Scope) (Literal, error) {
-	return evaluateWith(g.Expression, s)
-}
+func (i *interpreter) variable(v *Variable) (Literal, error) {
+	key := v.Identifier.Lexeme
 
-func evaluateBinary(b *Binary, s *Scope) (Literal, error) {
-	left, err := evaluateWith(b.Left, s)
+	rawValue, found := i.env.Get(key)
+
+	if !found {
+		return Literal{}, loxRuntimeError{v.Identifier, fmt.Sprintf("undefined variable %q", key)}
+	}
+
+	value, err := i.evaluate(rawValue)
 	if err != nil {
 		return Literal{}, err
 	}
 
-	right, err := evaluateWith(b.Right, s)
+	_ = i.env.Set(key, value)
+	return value, nil
+}
+
+func (i *interpreter) literal(l *Literal) (Literal, error) {
+	return *l, nil
+}
+
+func (i *interpreter) grouping(g *Grouping) (Literal, error) {
+	return i.evaluate(g.Expression)
+}
+
+func (i *interpreter) binary(b *Binary) (Literal, error) {
+	left, err := i.evaluate(b.Left)
+	if err != nil {
+		return Literal{}, err
+	}
+
+	right, err := i.evaluate(b.Right)
 	if err != nil {
 		return Literal{}, err
 	}
@@ -158,8 +205,8 @@ func evaluateBinary(b *Binary, s *Scope) (Literal, error) {
 	}
 }
 
-func evaluateUnary(u *Unary, s *Scope) (Literal, error) {
-	right, err := evaluateWith(u.Right, s)
+func (i *interpreter) unary(u *Unary) (Literal, error) {
+	right, err := i.evaluate(u.Right)
 	if err != nil {
 		return Literal{}, err
 	}

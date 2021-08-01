@@ -77,23 +77,23 @@ func run(r io.Reader) error {
 		return fmt.Errorf("intializing scanner: %w", err)
 	}
 
-	tokens, err := s.ScanTokens()
+	tokens, err := s.Scan()
 	if err != nil {
 		return fmt.Errorf("scanning for tokens: %w", err)
 	}
 
 	p := NewParser(tokens)
-	expr, err := p.Parse()
+	statements, err := p.Parse()
 	if err != nil {
 		return fmt.Errorf("while parsing: %w", err)
 	}
 
-	expr, err = Evaluate(expr)
+	i := NewInterpreter(statements)
+	err = i.Interpret()
 	if err != nil {
-		return err
+		return fmt.Errorf("while interpreting: %w", err)
 	}
 
-	fmt.Println(expr)
 	return nil
 }
 

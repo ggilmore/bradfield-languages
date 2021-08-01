@@ -32,13 +32,18 @@ func NewScanner(r io.Reader) (*Scanner, error) {
 	}, nil
 }
 
-func (s *Scanner) ScanTokens() ([]Token, error) {
+func (s *Scanner) Scan() ([]Token, error) {
 	for !s.isAtEnd() {
 		s.start = s.current
 		s.scanToken()
 	}
 
-	eof := Token{KindEOF, "", nil, s.line}
+	eof := Token{
+		Kind:    KindEOF,
+		Lexeme:  "",
+		Literal: nil,
+		Line:    s.line,
+	}
 	s.tokens = append(s.tokens, eof)
 
 	return s.tokens, s.errs.ErrorOrNil()
@@ -119,9 +124,7 @@ func (s *Scanner) scanToken() {
 			s.addToken(KindSlash)
 		}
 
-	case ' ':
-	case '\r':
-	case '\t':
+	case ' ', '\r', '\t':
 		break
 
 	case '\n':
