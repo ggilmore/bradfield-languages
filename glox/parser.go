@@ -1,15 +1,11 @@
 package main
 
 import (
-	"errors"
 	"fmt"
-
-	"github.com/hashicorp/go-multierror"
 )
 
 type Parser struct {
 	tokens  []Token
-	errs    multierror.Error
 	current int
 }
 
@@ -19,39 +15,104 @@ func NewParser(tokens []Token) *Parser {
 
 func (p *Parser) Parse() ([]Stmt, error) {
 	var statements []Stmt
+	var errs parseErrors
 
 	for !p.isAtEnd() {
-		stmt, err := p.statement()
+		stmt, err := p.declaration()
 		if err != nil {
-			return nil, err
+			errs.Append(err)
+			p.synchronize()
+			continue
 		}
 
 		statements = append(statements, stmt)
 	}
 
-	return statements, nil
+	return statements, errs.ErrorOrNil()
 }
 
-func (p *Parser) declaration(Stmt, error) {
+func (p *Parser) declaration() (Stmt, error) {
 	if p.match(KindVar) {
-
-		_, err := p.varDeclarlation()
-
-		var parseErr parseError
-		if errors.As(err, &parseErr) {
-			p.synchronize()
-			p.errs = multierror.Append(&p.errs, parseErr)
-			return
-		}
+		return p.varDeclaration()
 
 	}
 
 	return p.statement()
 }
 
+func (p *Parser) varDeclaration() (Stmt, error) {
+	name, err := p.consume(KindIdentifier, "Expect variable name.")
+	if err != nil {
+		return nil, err
+	}
+
+	var initializer Expr
+	if p.match(KindEqual) {
+		init, err := p.expression()
+		if err != nil {
+			return nil, err
+		}
+
+		initializer = init
+	}
+
+	_, err = p.consume(KindSemicolon, "Expect ';' after variable declaration.")
+	if err != nil {
+		return nil, err
+	}
+
+	return Var{name, initializer}, nil
+
+}
+
+func (p *Parser) while() (Stmt, error) {
+	_, err := p.consume(KindLeftParen, "Expect '(' after while.")
+	if err != nil {
+		return nil, err
+	}
+
+	cond, err := p.expression()
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = p.consume(KindRightParen, "Expect ')' after condition.")
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := p.statement()
+	if err != nil {
+		return nil, err
+	}
+
+	return While{
+		condition: cond,
+		body:      body,
+	}, nil
+
+}
+
 func (p *Parser) statement() (Stmt, error) {
 	if p.match(KindPrint) {
 		return p.printStatement()
+	}
+
+	if p.match(KindLeftBrace) {
+		statements, err := p.block()
+		if err != nil {
+			return nil, err
+
+		}
+		return Block{statements}, nil
+	}
+
+	if p.match(KindFor) {
+		return p.forStatement()
+	}
+
+	if p.match(KindIf) {
+		return p.ifStatement()
 	}
 
 	return p.expressionStatement()
@@ -71,6 +132,136 @@ func (p *Parser) printStatement() (Stmt, error) {
 	return Print{value}, nil
 }
 
+func (p *Parser) forStatement() (Stmt, error) {
+	_, err := p.consume(KindLeftParen, "Expect '(' after 'for'.")
+	if err != nil {
+		return nil, err
+	}
+
+	var initializer *Stmt
+	if p.match(KindSemicolon) {
+		initializer = nil
+	} else if p.match(KindVar) {
+		init, err := p.varDeclaration()
+		if err != nil {
+			return nil, err
+		}
+
+		initializer = &init
+	} else {
+		init, err := p.expressionStatement()
+		if err != nil {
+			return nil, err
+		}
+
+		initializer = &init
+	}
+
+	var condition *Expr
+	if !p.check(KindSemicolon) {
+		cond, err := p.expression()
+		if err != nil {
+			return nil, err
+		}
+
+		condition = &cond
+	}
+	_, err = p.consume(KindSemicolon, "Expect ';' after loop condition.")
+	if err != nil {
+		return nil, err
+	}
+
+	var increment *Expr
+	if !p.check(KindRightParen) {
+		inc, err := p.expression()
+		if err != nil {
+			return nil, err
+		}
+
+		increment = &inc
+	}
+	_, err = p.consume(KindRightParen, "Expect ')' after for clauses.")
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := p.statement()
+	if err != nil {
+		return nil, err
+	}
+
+	if increment != nil {
+		body = Block{
+			[]Stmt{
+				body,
+				Expression{*increment},
+			},
+		}
+	}
+
+	if condition == nil {
+		var trueExpr Expr = Literal{true}
+		condition = &trueExpr
+
+	}
+	body = While{
+		condition: *condition,
+		body:      body,
+	}
+
+	if initializer != nil {
+		body = Block{
+			[]Stmt{
+				*initializer,
+				body,
+			},
+		}
+
+	}
+
+	return body, nil
+}
+
+func (p *Parser) ifStatement() (Stmt, error) {
+	_, err := p.consume(KindLeftParen, "Expect '(' after 'if'.")
+	if err != nil {
+		return nil, err
+	}
+
+	cond, err := p.expression()
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = p.consume(KindRightParen, "Expect ')' after 'if'.")
+	if err != nil {
+		return nil, err
+	}
+
+	thenBranch, err := p.statement()
+	if err != nil {
+		return nil, err
+	}
+
+	var elseBranch *Stmt
+	if p.match(KindElse) {
+		elseB, err := p.statement()
+		if err != nil {
+			return nil, err
+		}
+
+		elseBranch = &elseB
+
+	}
+
+	return If{
+		condition:  cond,
+		thenBranch: thenBranch,
+		elseBranch: elseBranch,
+	}, nil
+
+}
+
 func (p *Parser) expressionStatement() (Stmt, error) {
 	expr, err := p.expression()
 	if err != nil {
@@ -83,6 +274,71 @@ func (p *Parser) expressionStatement() (Stmt, error) {
 	}
 
 	return Expression{expr}, nil
+}
+
+func (p *Parser) block() ([]Stmt, error) {
+	var statements []Stmt
+
+	for !p.check(KindRightBrace) && !p.isAtEnd() {
+		stmt, err := p.declaration()
+		if err != nil {
+			return nil, err
+		}
+
+		statements = append(statements, stmt)
+	}
+
+	_, err := p.consume(KindRightBrace, "Expect '}' after block.")
+	if err != nil {
+		return nil, err
+	}
+
+	return statements, nil
+}
+
+func (p *Parser) or() (Expr, error) {
+	expr, err := p.and()
+	if err != nil {
+		return nil, err
+	}
+	for p.match(KindOr) {
+		operator := p.previous()
+		right, err := p.and()
+		if err != nil {
+			return nil, err
+		}
+
+		expr = Logical{
+			Left:     expr,
+			Operator: operator,
+			Right:    right,
+		}
+	}
+
+	return expr, nil
+}
+
+func (p *Parser) and() (Expr, error) {
+	expr, err := p.equality()
+	if err != nil {
+		return nil, err
+	}
+
+	for p.match(KindAnd) {
+		operator := p.previous()
+		right, err := p.equality()
+		if err != nil {
+			return nil, err
+		}
+
+		expr = Logical{
+			Left:     expr,
+			Operator: operator,
+			Right:    right,
+		}
+	}
+
+	return expr, nil
 }
 
 func (p *Parser) expression() (Expr, error) {
@@ -121,7 +377,28 @@ func (p *Parser) assignment() (Expr, error) {
 		return nil, p.error(p.peek(), "expected identifier")
 	}
 
-	return p.equality()
+	expr, err := p.or()
+	if err != nil {
+		return nil, err
+	}
+
+	if p.match(KindEqual) {
+		equals := p.previous()
+		value, err := p.assignment()
+		if err != nil {
+			return nil, err
+		}
+
+		variableExpr, ok := expr.(Variable)
+		if !ok {
+			return nil, p.error(equals, "Invalid assingment target.")
+		}
+
+		name := variableExpr.Identifier
+		return Assignment{name, value}, nil
+	}
+
+	return expr, nil
 }
 
 func (p *Parser) equality() (Expr, error) {
@@ -327,14 +604,9 @@ func (p *Parser) synchronize() {
 	}
 
 	switch p.peek().Kind {
-	case KindClass:
-	case KindFun:
-	case KindVar:
-	case KindFor:
-	case KindIf:
-	case KindWhile:
-	case KindPrint:
-	case KindReturn:
+	case
+		KindClass, KindFun, KindVar, KindFor,
+		KindIf, KindWhile, KindPrint, KindReturn:
 		return
 	}
 
@@ -345,6 +617,34 @@ func (p *Parser) error(t Token, message string) error {
 	return &parseError{t.Line, t, message}
 }
 
+type parseErrors struct {
+	errs []error
+}
+
+func (e *parseErrors) Append(err error) {
+	e.errs = append(e.errs, err)
+}
+
+func (e parseErrors) Error() string {
+	out := fmt.Sprintf("There were %d error(s)\n", len(e.errs))
+
+	for _, e := range e.errs {
+		out += fmt.Sprintf("- %s\n", e.Error())
+	}
+
+	return out
+}
+
+func (e parseErrors) ErrorOrNil() error {
+	if e.errs == nil {
+		return nil
+	}
+
+	return e
+}
+
+func (e parseErrors) IsLoxLanguageError() {}
+
 type parseError struct {
 	line    int
 	token   Token
@@ -352,7 +652,7 @@ type parseError struct {
 }
 
 func (e parseError) Error() string {
-	location := fmt.Sprint("%q", e.token.Lexeme)
+	location := fmt.Sprintf("%q", e.token.Lexeme)
 	if e.token.Kind == KindEOF {
 		location = "end"
 	}

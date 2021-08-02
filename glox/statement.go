@@ -13,9 +13,28 @@ type Expression struct {
 }
 
 type Var struct {
-	name Token
+	name        Token
+	initializer Expr
+}
+
+type Block struct {
+	statements []Stmt
+}
+
+type If struct {
+	condition  Expr
+	thenBranch Stmt
+	elseBranch *Stmt
+}
+
+type While struct {
+	condition Expr
+	body      Stmt
 }
 
 func (p Print) IsStatement()      {}
 func (e Expression) IsStatement() {}
 func (v Var) IsStatement()        {}
+func (b Block) IsStatement()      {}
+func (i If) IsStatement()         {}
+func (w While) IsStatement()      {}

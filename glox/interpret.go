@@ -3,22 +3,22 @@ package main
 import (
 	"fmt"
 	"strings"
+
+	"github.com/kr/pretty"
 )
 
 type interpreter struct {
-	statements []Stmt
-	env        *Environment
+	env *Environment
 }
 
-func NewInterpreter(statements []Stmt) *interpreter {
+func NewInterpreter() *interpreter {
 	return &interpreter{
-		statements: statements,
-		env:        NewEnvironment(nil),
+		env: NewEnvironment(nil),
 	}
 }
 
-func (i *interpreter) Interpret() error {
-	for _, s := range i.statements {
+func (i *interpreter) Interpret(statements []Stmt) error {
+	for _, s := range statements {
 		err := i.execute(s)
 		if err != nil {
 			return err
@@ -29,11 +29,22 @@ func (i *interpreter) Interpret() error {
 }
 
 func (i *interpreter) execute(s Stmt) error {
+	// fmt.Println("env")
+	// pretty.Println(i.env)
+	// pretty.Printf("Literal: %s %s\n", Literal{float64(0)}, Literal{nil})
 	switch stmt := s.(type) {
 	case Print:
 		return i.printStmt(stmt)
 	case Expression:
 		return i.expressionStmt(stmt)
+	case Var:
+		return i.varStmt(stmt)
+	case Block:
+		return i.blockStmt(stmt)
+	case If:
+		return i.ifStmt(stmt)
+	case While:
+		return i.whileStmt(stmt)
 	}
 
 	panic(fmt.Sprintf("unhandled statement type %+v", s))
@@ -53,6 +64,10 @@ func (i *interpreter) evaluate(e Expr) (Literal, error) {
 		return i.binary(&expr)
 	case Let:
 		return i.let(&expr)
+	case Assignment:
+		return i.assignment(&expr)
+	case Logical:
+		return i.logical(&expr)
 	}
 
 	panic(fmt.Sprintf("unhandled expression type %+v", e))
@@ -73,7 +88,69 @@ func (i *interpreter) printStmt(p Print) error {
 	return nil
 }
 
-func (i *interpreter) let(l *Let) (Literal, error) {
+func (i *interpreter) varStmt(v Var) error {
+	name := v.name.Lexeme
+	var rawValue Expr = Literal{nil}
+
+	if v.initializer != nil {
+		rawValue = v.initializer
+
+	}
+
+	value, err := i.evaluate(rawValue)
+	if err != nil {
+		return err
+	}
+
+	i.env.Define(name, value)
+	return nil
+}
+
+func (i *interpreter) ifStmt(ifStmt If) error {
+	cond, err := i.evaluate(ifStmt.condition)
+	if err != nil {
+		return err
+	}
+
+	if isTruthy(cond.Value) {
+		err := i.execute(ifStmt.thenBranch)
+		if err != nil {
+			return err
+		}
+
+	} else if ifStmt.elseBranch != nil {
+		err := i.execute(*ifStmt.elseBranch)
+		if err != nil {
+			return err
+		}
+
+	}
+
+	return nil
+}
+
+func (i *interpreter) whileStmt(w While) error {
+
+	for {
+		cond, err := i.evaluate(w.condition)
+		if err != nil {
+			return err
+		}
+
+		if !isTruthy(cond.Value) {
+			break
+		}
+
+		err = i.execute(w.body)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (i *interpreter) blockStmt(b Block) error {
 	originalEnv := i.env
 	defer func() {
 		i.env = originalEnv
@@ -81,11 +158,67 @@ func (i *interpreter) let(l *Let) (Literal, error) {
 
 	i.env = NewEnvironment(originalEnv)
 
+	for _, stmt := range b.statements {
+		err := i.execute(stmt)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (i *interpreter) let(l *Let) (Literal, error) {
+	originalEnv := i.env
+	defer func() {
+		i.env = originalEnv
+	}()
+
+	i.env = NewEnvironment(i.env)
+
 	name := l.Identifier.Lexeme
 	value := l.Init
 	i.env.Define(name, value)
 
 	return i.evaluate(l.Body)
+}
+
+func (i *interpreter) assignment(a *Assignment) (Literal, error) {
+	name := a.Name.Lexeme
+	value, err := i.evaluate(a.value)
+	if err != nil {
+		return Literal{}, err
+	}
+	pretty.Print("a.value!:")
+	pretty.Println(a.value)
+	pretty.Print("Assignment!: i")
+	pretty.Println(value)
+	found := i.env.Set(name, value)
+
+	if !found {
+		return Literal{}, loxRuntimeError{a.Name, fmt.Sprintf("undefined variable %q", name)}
+	}
+
+	return value, nil
+}
+
+func (i *interpreter) logical(l *Logical) (Literal, error) {
+	left, err := i.evaluate(l.Left)
+	if err != nil {
+		return Literal{}, err
+	}
+
+	if l.Operator.Kind == KindOr {
+		if isTruthy(left.Value) {
+			return left, nil
+		}
+	} else {
+		if !isTruthy(left.Value) {
+			return left, nil
+		}
+	}
+
+	return i.evaluate(l.Right)
 }
 
 func (i *interpreter) variable(v *Variable) (Literal, error) {
@@ -162,6 +295,11 @@ func (i *interpreter) binary(b *Binary) (Literal, error) {
 				return Literal{l + r}, nil
 			}
 		}
+
+		// fmt.Println("Left")
+		// pretty.Println(left)
+		// fmt.Println("Right")
+		// pretty.Println(right)
 
 		return Literal{}, loxRuntimeError{operator, "operands must be two numbers or two strings"}
 	case KindGreater:

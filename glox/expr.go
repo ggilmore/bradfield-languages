@@ -74,9 +74,30 @@ func (l Let) String() string {
 	return pretty.Sprint(l)
 }
 
-func (b Binary) isExpr()   {}
-func (g Grouping) isExpr() {}
-func (l Literal) isExpr()  {}
-func (u Unary) isExpr()    {}
-func (l Let) isExpr()      {}
-func (v Variable) isExpr() {}
+type Assignment struct {
+	Name  Token
+	value Expr
+}
+
+func (a Assignment) String() string {
+	return pretty.Sprint(a)
+}
+
+type Logical struct {
+	Left     Expr
+	Operator Token
+	Right    Expr
+}
+
+func (l Logical) String() string {
+	return pretty.Sprint(l)
+}
+
+func (b Binary) isExpr()     {}
+func (g Grouping) isExpr()   {}
+func (l Literal) isExpr()    {}
+func (u Unary) isExpr()      {}
+func (l Let) isExpr()        {}
+func (v Variable) isExpr()   {}
+func (a Assignment) isExpr() {}
+func (l Logical) isExpr()    {}
