@@ -1,11 +1,11 @@
-package main
+package token
 
 import "fmt"
 
-type TokenKind int
+type Kind int
 
 const (
-	KindLeftParen TokenKind = iota
+	KindLeftParen Kind = iota
 	KindRightParen
 	KindLeftBrace
 	KindRightBrace
@@ -52,7 +52,7 @@ const (
 	KindEOF
 )
 
-func (t TokenKind) String() string {
+func (t Kind) String() string {
 	switch t {
 	case KindLeftParen:
 		return "LeftParen"
@@ -90,7 +90,7 @@ func (t TokenKind) String() string {
 	case KindGreaterEqual:
 		return "GreaterEqual"
 	case KindLess:
-		return "Les"
+		return "Less"
 	case KindLessEqual:
 		return "LessEqual"
 
@@ -146,7 +146,7 @@ func (t TokenKind) String() string {
 
 }
 
-var Keywords = map[string]TokenKind{
+var Keywords = map[string]Kind{
 	"and":    KindAnd,
 	"let":    KindLet,
 	"in":     KindIn,
@@ -168,12 +168,12 @@ var Keywords = map[string]TokenKind{
 }
 
 type Token struct {
-	Kind    TokenKind
+	Kind    Kind
 	Lexeme  string
 	Literal interface{}
 	Line    int
 }
 
 func (t Token) String() string {
-	return fmt.Sprintf("%s: %q [%v]", t.Kind.String(), t.Lexeme, t.Literal)
+	return fmt.Sprintf("Token<%s>{%q, [%v]}", t.Kind.String(), t.Lexeme, t.Literal)
 }

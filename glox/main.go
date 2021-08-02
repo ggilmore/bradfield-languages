@@ -7,6 +7,11 @@ import (
 	"io"
 	"os"
 	"strings"
+
+	"github.com/ggilmore/bradfield-languages/glox/errutil"
+	"github.com/ggilmore/bradfield-languages/glox/interpreter"
+	"github.com/ggilmore/bradfield-languages/glox/parser"
+	"github.com/ggilmore/bradfield-languages/glox/scanner"
 )
 
 const (
@@ -35,7 +40,7 @@ func runFile(path string) {
 		printError(fmt.Errorf("opening %q: %w", path, err))
 		die(err)
 	}
-	runner := NewRunner()
+	runner := newRunner()
 	err = runner.Run(f)
 	if err != nil {
 		printError(fmt.Errorf("running %q: %w", path, err))
@@ -44,7 +49,7 @@ func runFile(path string) {
 }
 
 func runPrompt(r io.Reader) {
-	runner := NewRunner()
+	runner := newRunner()
 	s := bufio.NewScanner(r)
 
 	prompt := "> "
@@ -57,8 +62,8 @@ func runPrompt(r io.Reader) {
 		if err != nil {
 			printError(err)
 
-			var runErr loxRuntimeError
-			if !errors.As(err, &runErr) {
+			var runErr interpreter.Error
+			if !errors.Is(err, &runErr) {
 				die(err)
 			}
 		}
@@ -72,18 +77,18 @@ func runPrompt(r io.Reader) {
 	}
 }
 
-type Runner struct {
-	interpreter *interpreter
+type runner struct {
+	interpreter *interpreter.Interpreter
 }
 
-func NewRunner() *Runner {
-	return &Runner{
-		interpreter: NewInterpreter(),
+func newRunner() *runner {
+	return &runner{
+		interpreter: interpreter.New(),
 	}
 }
 
-func (r *Runner) Run(input io.Reader) error {
-	s, err := NewScanner(input)
+func (r *runner) Run(input io.Reader) error {
+	s, err := scanner.New(input)
 	if err != nil {
 		return fmt.Errorf("intializing scanner: %w", err)
 	}
@@ -93,7 +98,7 @@ func (r *Runner) Run(input io.Reader) error {
 		return fmt.Errorf("scanning for tokens: %w", err)
 	}
 
-	statements, err := NewParser(tokens).Parse()
+	statements, err := parser.NewParser(tokens).Parse()
 	if err != nil {
 		return fmt.Errorf("while parsing: %w", err)
 	}
@@ -107,12 +112,12 @@ func (r *Runner) Run(input io.Reader) error {
 }
 
 func die(e error) {
-	var runErr loxRuntimeError
-	if errors.As(e, &runErr) {
+	var runErr interpreter.Error
+	if errors.Is(e, &runErr) {
 		os.Exit(ExRuntime)
 	}
 
-	var loxErr loxError
+	var loxErr errutil.LoxLanguageError
 	if errors.As(e, &loxErr) {
 		os.Exit(ExLox)
 	}
@@ -121,8 +126,7 @@ func die(e error) {
 }
 
 func printError(err error) {
-
-	var e LoxLanguageError
+	var e errutil.LoxLanguageError
 	if errors.As(err, &e) {
 		// only print the underlying error if it's a lox
 		// error so that don't clutter the output with
@@ -134,19 +138,3 @@ func printError(err error) {
 	fmt.Fprint(os.Stderr, err.Error())
 
 }
-
-type LoxLanguageError interface {
-	IsLoxLanguageError()
-	error
-}
-
-type loxError struct {
-	line    int
-	message string
-}
-
-func (e loxError) Error() string {
-	return fmt.Sprintf("[line %d] Error: %s", e.line, e.message)
-}
-
-func (e loxError) IsLoxLanguageError() {}

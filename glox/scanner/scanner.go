@@ -1,25 +1,25 @@
-package main
+package scanner
 
 import (
 	"fmt"
 	"io"
 	"strconv"
 
-	"github.com/hashicorp/go-multierror"
+	"github.com/ggilmore/bradfield-languages/glox/token"
 )
 
 type Scanner struct {
 	input  []rune
-	tokens []Token
+	tokens []token.Token
 
-	errs *multierror.Error
+	errs ErrorList
 
 	start   int
 	current int
 	line    int
 }
 
-func NewScanner(r io.Reader) (*Scanner, error) {
+func New(r io.Reader) (*Scanner, error) {
 	b, err := io.ReadAll(r)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read from reader: %s", err)
@@ -32,14 +32,14 @@ func NewScanner(r io.Reader) (*Scanner, error) {
 	}, nil
 }
 
-func (s *Scanner) Scan() ([]Token, error) {
+func (s *Scanner) Scan() ([]token.Token, error) {
 	for !s.isAtEnd() {
 		s.start = s.current
 		s.scanToken()
 	}
 
-	eof := Token{
-		Kind:    KindEOF,
+	eof := token.Token{
+		Kind:    token.KindEOF,
 		Lexeme:  "",
 		Literal: nil,
 		Line:    s.line,
@@ -54,63 +54,63 @@ func (s *Scanner) scanToken() {
 
 	switch c {
 	case '(':
-		s.addToken(KindLeftParen)
+		s.addToken(token.KindLeftParen)
 
 	case ')':
-		s.addToken(KindRightParen)
+		s.addToken(token.KindRightParen)
 
 	case '{':
-		s.addToken(KindLeftBrace)
+		s.addToken(token.KindLeftBrace)
 
 	case '}':
-		s.addToken(KindRightBrace)
+		s.addToken(token.KindRightBrace)
 
 	case ',':
-		s.addToken(KindComma)
+		s.addToken(token.KindComma)
 
 	case '.':
-		s.addToken(KindDot)
+		s.addToken(token.KindDot)
 
 	case '-':
-		s.addToken(KindMinus)
+		s.addToken(token.KindMinus)
 
 	case '+':
-		s.addToken(KindPlus)
+		s.addToken(token.KindPlus)
 
 	case ';':
-		s.addToken(KindSemicolon)
+		s.addToken(token.KindSemicolon)
 
 	case '*':
-		s.addToken(KindStar)
+		s.addToken(token.KindStar)
 
 	case '!':
-		kind := KindBang
+		kind := token.KindBang
 		if s.match('=') {
-			kind = KindBangEqual
+			kind = token.KindBangEqual
 		}
 
 		s.addToken(kind)
 
 	case '=':
-		kind := KindEqual
+		kind := token.KindEqual
 		if s.match('=') {
-			kind = KindEqualEqual
+			kind = token.KindEqualEqual
 		}
 
 		s.addToken(kind)
 
 	case '<':
-		kind := KindLess
+		kind := token.KindLess
 		if s.match('=') {
-			kind = KindLessEqual
+			kind = token.KindLessEqual
 		}
 
 		s.addToken(kind)
 
 	case '>':
-		kind := KindGreater
+		kind := token.KindGreater
 		if s.match('=') {
-			kind = KindGreaterEqual
+			kind = token.KindGreaterEqual
 		}
 
 		s.addToken(kind)
@@ -121,7 +121,7 @@ func (s *Scanner) scanToken() {
 				s.advance()
 			}
 		} else {
-			s.addToken(KindSlash)
+			s.addToken(token.KindSlash)
 		}
 
 	case ' ', '\r', '\t':
@@ -139,8 +139,7 @@ func (s *Scanner) scanToken() {
 		} else if s.isAlpha(c) {
 			s.identifier()
 		} else {
-			err := loxError{s.line, fmt.Sprintf("Unexpected character %q.", c)}
-			s.errs = multierror.Append(s.errs, err)
+			s.errs.Add(s.line, fmt.Sprintf("Unexpected character %q.", c))
 		}
 	}
 }
@@ -151,9 +150,9 @@ func (s *Scanner) identifier() {
 	}
 
 	text := string(s.input[s.start:s.current])
-	kind, isKeyword := Keywords[text]
+	kind, isKeyword := token.Keywords[text]
 	if !isKeyword {
-		kind = KindIdentifier
+		kind = token.KindIdentifier
 	}
 
 	s.addToken(kind)
@@ -169,9 +168,7 @@ func (s *Scanner) string() {
 	}
 
 	if s.isAtEnd() {
-		e := loxError{s.line, "Unterminated string."}
-		s.errs = multierror.Append(s.errs, e)
-
+		s.errs.Add(s.line, "Unterminated string.")
 		return
 	}
 
@@ -179,7 +176,7 @@ func (s *Scanner) string() {
 	s.advance()
 
 	v := string(s.input[s.start+1 : s.current-1])
-	s.addTokenLiteral(KindString, v)
+	s.addTokenLiteral(token.KindString, v)
 }
 
 func (s *Scanner) number() {
@@ -204,7 +201,7 @@ func (s *Scanner) number() {
 		panic(fmt.Errorf("when parsing float - unable to convert %q to float64: %s", v, err))
 	}
 
-	s.addTokenLiteral(KindNumber, f)
+	s.addTokenLiteral(token.KindNumber, f)
 }
 
 func (s *Scanner) isAlphaNumeric(c rune) bool {
@@ -257,12 +254,12 @@ func (s *Scanner) peekNext() rune {
 	return s.input[s.current+1]
 }
 
-func (s *Scanner) addToken(kind TokenKind) {
+func (s *Scanner) addToken(kind token.Kind) {
 	s.addTokenLiteral(kind, nil)
 }
 
-func (s *Scanner) addTokenLiteral(kind TokenKind, literal interface{}) {
-	s.tokens = append(s.tokens, Token{
+func (s *Scanner) addTokenLiteral(kind token.Kind, literal interface{}) {
+	s.tokens = append(s.tokens, token.Token{
 		Kind: kind,
 
 		Lexeme:  string(s.input[s.start:s.current]),
