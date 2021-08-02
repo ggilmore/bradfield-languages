@@ -7,8 +7,6 @@ import (
 	"io"
 	"os"
 	"strings"
-
-	"github.com/kr/pretty"
 )
 
 const (
@@ -99,7 +97,6 @@ func (r *Runner) Run(input io.Reader) error {
 	if err != nil {
 		return fmt.Errorf("while parsing: %w", err)
 	}
-	pretty.Println(statements)
 
 	err = r.interpreter.Interpret(statements)
 	if err != nil {

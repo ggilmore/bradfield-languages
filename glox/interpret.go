@@ -3,8 +3,6 @@ package main
 import (
 	"fmt"
 	"strings"
-
-	"github.com/kr/pretty"
 )
 
 type interpreter struct {
@@ -29,9 +27,6 @@ func (i *interpreter) Interpret(statements []Stmt) error {
 }
 
 func (i *interpreter) execute(s Stmt) error {
-	// fmt.Println("env")
-	// pretty.Println(i.env)
-	// pretty.Printf("Literal: %s %s\n", Literal{float64(0)}, Literal{nil})
 	switch stmt := s.(type) {
 	case Print:
 		return i.printStmt(stmt)
@@ -189,10 +184,7 @@ func (i *interpreter) assignment(a *Assignment) (Literal, error) {
 	if err != nil {
 		return Literal{}, err
 	}
-	pretty.Print("a.value!:")
-	pretty.Println(a.value)
-	pretty.Print("Assignment!: i")
-	pretty.Println(value)
+
 	found := i.env.Set(name, value)
 
 	if !found {

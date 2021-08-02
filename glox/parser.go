@@ -20,6 +20,7 @@ func (p *Parser) Parse() ([]Stmt, error) {
 	for !p.isAtEnd() {
 		stmt, err := p.declaration()
 		if err != nil {
+			fmt.Println(err)
 			errs.Append(err)
 			p.synchronize()
 			continue
@@ -109,6 +110,10 @@ func (p *Parser) statement() (Stmt, error) {
 
 	if p.match(KindFor) {
 		return p.forStatement()
+	}
+
+	if p.match(KindWhile) {
+		return p.while()
 	}
 
 	if p.match(KindIf) {

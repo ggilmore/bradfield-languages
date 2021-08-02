@@ -40,8 +40,9 @@ func (e *Environment) Define(name string, value Expr) {
 func (e *Environment) Set(name string, value Expr) bool {
 	current := e
 	for current != nil {
-		_, found := current.Get(name)
+		_, found := current.storage[name]
 		if !found {
+			current = current.Parent
 			continue
 		}
 
