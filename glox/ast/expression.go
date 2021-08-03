@@ -99,6 +99,16 @@ func (l *Logical) String() string {
 	return fmt.Sprintf("Logical{Left: %s, Operator: %s, Right: %s}", l.Left, l.Operator, l.Right)
 }
 
+type Debug struct {
+	Left     Expression
+	Operator token.Token
+	Right    Expression
+}
+
+func (d *Debug) String() string {
+	return "Debug{}"
+}
+
 func (b *Binary) isExpression()     {}
 func (g *Grouping) isExpression()   {}
 func (l *Literal) isExpression()    {}
@@ -107,6 +117,7 @@ func (l *Let) isExpression()        {}
 func (v *Variable) isExpression()   {}
 func (a *Assignment) isExpression() {}
 func (l *Logical) isExpression()    {}
+func (d *Debug) isExpression()      {}
 
 var (
 	_ Expression = &Binary{}
@@ -117,4 +128,5 @@ var (
 	_ Expression = &Variable{}
 	_ Expression = &Assignment{}
 	_ Expression = &Logical{}
+	_ Expression = &Debug{}
 )

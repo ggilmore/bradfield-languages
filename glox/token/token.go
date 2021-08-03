@@ -48,6 +48,7 @@ const (
 	KindTrue
 	KindVar
 	KindWhile
+	KindDebug
 
 	KindEOF
 )
@@ -137,6 +138,8 @@ func (t Kind) String() string {
 		return "While"
 	case KindIn:
 		return "In"
+	case KindDebug:
+		return "Debug"
 
 	case KindEOF:
 		return "EOF"
@@ -165,6 +168,7 @@ var Keywords = map[string]Kind{
 	"true":   KindTrue,
 	"var":    KindVar,
 	"while":  KindWhile,
+	"debug":  KindDebug,
 }
 
 type Token struct {

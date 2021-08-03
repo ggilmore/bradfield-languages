@@ -1,6 +1,8 @@
 package parser
 
 import (
+	"fmt"
+
 	"github.com/ggilmore/bradfield-languages/glox/ast"
 	"github.com/ggilmore/bradfield-languages/glox/token"
 )
@@ -22,6 +24,7 @@ func (p *Parser) Parse() ([]ast.Statement, error) {
 		stmt, err := p.declaration()
 		if err != nil {
 			errs.Add(err)
+			fmt.Println(err)
 			p.synchronize()
 			continue
 		}
@@ -521,6 +524,10 @@ func (p *Parser) primary() (ast.Expression, error) {
 
 	if p.match(token.KindNumber, token.KindString) {
 		return &ast.Literal{Value: p.previous().Literal}, nil
+	}
+
+	if p.match(token.KindDebug) {
+		return &ast.Debug{}, nil
 	}
 
 	if p.match(token.KindIdentifier) {

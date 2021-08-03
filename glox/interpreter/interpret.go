@@ -2,6 +2,7 @@ package interpreter
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/ggilmore/bradfield-languages/glox/ast"
 	"github.com/ggilmore/bradfield-languages/glox/env"
@@ -157,9 +158,19 @@ func (i *Interpreter) evaluate(expr ast.Expression) (*ast.Literal, error) {
 		return i.assignment(e)
 	case *ast.Logical:
 		return i.logical(e)
+	case *ast.Debug:
+		return i.debug(e)
 	}
 
 	panic(fmt.Sprintf("unhandled expression type %+v", expr))
+}
+
+func (i *Interpreter) debug(d *ast.Debug) (*ast.Literal, error) {
+	fmt.Println(i.env.Debug())
+	fmt.Fprintln(os.Stderr, "Press enter to continue...")
+	fmt.Scanln()
+
+	return &ast.Literal{Value: nil}, nil
 }
 
 func (i *Interpreter) let(l *ast.Let) (*ast.Literal, error) {

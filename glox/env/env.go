@@ -1,6 +1,12 @@
 package env
 
-import "github.com/ggilmore/bradfield-languages/glox/ast"
+import (
+	"bytes"
+	"strconv"
+
+	"github.com/ggilmore/bradfield-languages/glox/ast"
+	"github.com/olekukonko/tablewriter"
+)
 
 type Environment struct {
 	Parent  *Environment
@@ -18,14 +24,11 @@ func New(outer *Environment) *Environment {
 // defined. "found" is true if a value for "name" was found, or false
 // if no scope in the environment contained a defintion for it.
 func (e *Environment) Get(name string) (value ast.Expression, found bool) {
-	current := e
-	for current != nil {
+	for current := e; current != nil; current = current.Parent {
 		value, found := current.storage[name]
 		if found {
 			return value, true
 		}
-
-		current = current.Parent
 	}
 
 	return nil, false
@@ -40,16 +43,60 @@ func (e *Environment) Define(name string, value ast.Expression) {
 // scope that defines "name". The return value is true if the value was set
 // within that scope, or false if no enclosign scope had the variable defined.
 func (e *Environment) Set(name string, value ast.Expression) bool {
-	current := e
-	for current != nil {
+	for current := e; current != nil; current = current.Parent {
 		_, found := current.storage[name]
 		if found {
 			current.storage[name] = value
 			return true
 		}
-
-		current = current.Parent
 	}
 
 	return false
+}
+
+func (e *Environment) Debug() string {
+	var scopes []string
+
+	for current := e; current != nil; current = current.Parent {
+		if len(current.storage) == 0 {
+			scopes = append(scopes, "<EMPTY>")
+			continue
+		}
+
+		var b bytes.Buffer
+		t := tablewriter.NewWriter(&b)
+
+		t.SetHeader([]string{"name", "value"})
+		for name, rawValue := range current.storage {
+			value := rawValue.String()
+			if literal, ok := rawValue.(*ast.Literal); ok {
+				value = literal.Output()
+			}
+
+			t.Append([]string{name, value})
+		}
+
+		t.SetRowSeparator(".")
+		t.SetRowLine(true)
+
+		t.Render()
+
+		scopes = append(scopes, b.String())
+	}
+
+	var out bytes.Buffer
+	t := tablewriter.NewWriter(&out)
+
+	t.SetHeader([]string{"scope level", "environment"})
+	for i := len(scopes) - 1; i >= 0; i-- {
+		level := strconv.Itoa(-i)
+		t.Append([]string{level, scopes[i]})
+	}
+
+	t.SetRowSeparator("-")
+	t.SetRowLine(true)
+
+	t.Render()
+
+	return out.String()
 }
