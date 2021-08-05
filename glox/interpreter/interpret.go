@@ -10,12 +10,19 @@ import (
 )
 
 type Interpreter struct {
-	env *env.Environment
+	globals *env.Environment
+	env     *env.Environment
+	locals  map[ast.Expression]int
 }
 
 func New() *Interpreter {
+	globals := env.New(nil)
+	globals.Define("clock", clockFunction)
+
 	return &Interpreter{
-		env: env.New(nil),
+		globals: globals,
+		env:     globals,
+		locals:  make(map[ast.Expression]int),
 	}
 }
 
@@ -28,6 +35,10 @@ func (i *Interpreter) Interpret(statements []ast.Statement) error {
 	}
 
 	return nil
+}
+
+func (i *Interpreter) resolve(e ast.Expression, depth int) {
+	i.locals[e] = depth
 }
 
 func (i *Interpreter) execute(stmt ast.Statement) error {
@@ -44,6 +55,10 @@ func (i *Interpreter) execute(stmt ast.Statement) error {
 		return i.ifStmt(s)
 	case *ast.WhileStatement:
 		return i.whileStmt(s)
+	case *ast.FunctionStatement:
+		return i.functionStmt(s)
+	case *ast.ReturnStatement:
+		return i.returnStmt(s)
 	}
 
 	panic(fmt.Sprintf("unhandled statement type %+v", stmt))
@@ -52,6 +67,20 @@ func (i *Interpreter) execute(stmt ast.Statement) error {
 func (i *Interpreter) expressionStmt(e *ast.ExpressionStatement) error {
 	_, err := i.evaluate(e.Expression)
 	return err
+}
+
+func (i *Interpreter) returnStmt(r *ast.ReturnStatement) error {
+	var value ast.Expression
+	if r.Value != nil {
+		expr, err := i.evaluate(r.Value)
+		if err != nil {
+			return err
+		}
+
+		value = expr
+	}
+
+	return &returnError{Value: value}
 }
 
 func (i *Interpreter) printStmt(p *ast.PrintStatement) error {
@@ -123,20 +152,35 @@ func (i *Interpreter) whileStmt(w *ast.WhileStatement) error {
 }
 
 func (i *Interpreter) blockStmt(b *ast.BlockStatement) error {
+	return i.executeBlock(b.Statements, env.New(i.env))
+}
+
+func (i *Interpreter) executeBlock(statements []ast.Statement, environment *env.Environment) error {
 	originalEnv := i.env
 	defer func() {
 		i.env = originalEnv
 	}()
 
-	i.env = env.New(originalEnv)
+	i.env = environment
 
-	for _, stmt := range b.Statements {
+	for _, stmt := range statements {
 		err := i.execute(stmt)
 		if err != nil {
 			return err
 		}
 	}
 
+	return nil
+}
+
+func (i *Interpreter) functionStmt(f *ast.FunctionStatement) error {
+	function := LoxFunction{
+		Declaration: f,
+		Closure:     i.env,
+	}
+
+	name := f.Name.Lexeme
+	i.env.Define(name, &ast.Literal{Value: &function})
 	return nil
 }
 
@@ -160,17 +204,53 @@ func (i *Interpreter) evaluate(expr ast.Expression) (*ast.Literal, error) {
 		return i.logical(e)
 	case *ast.Debug:
 		return i.debug(e)
+	case *ast.Call:
+		return i.call(e)
 	}
 
 	panic(fmt.Sprintf("unhandled expression type %+v", expr))
 }
 
-func (i *Interpreter) debug(d *ast.Debug) (*ast.Literal, error) {
-	fmt.Println(i.env.Debug())
+func (i *Interpreter) debug(_ *ast.Debug) (*ast.Literal, error) {
+	fmt.Fprintln(os.Stderr, i.env.Debug())
 	fmt.Fprintln(os.Stderr, "Press enter to continue...")
 	fmt.Scanln()
 
 	return &ast.Literal{Value: nil}, nil
+}
+
+func (i *Interpreter) call(c *ast.Call) (*ast.Literal, error) {
+	callee, err := i.evaluate(c.Callee)
+	if err != nil {
+		return nil, err
+	}
+
+	var arguments []ast.Expression
+	for _, rawArg := range c.Arguments {
+		arg, err := i.evaluate(rawArg)
+		if err != nil {
+			return nil, err
+		}
+
+		arguments = append(arguments, arg)
+	}
+
+	function, ok := callee.Value.(LoxCallable)
+	if !ok {
+		return nil, &Error{c.Paren, "Can only call functions and classes."}
+	}
+
+	if len(arguments) != function.Arity() {
+		message := fmt.Sprintf("Expected %d arguments but got %d.", function.Arity(), len(arguments))
+		return nil, &Error{c.Paren, message}
+	}
+
+	result, err := function.Call(i, arguments)
+	if err != nil {
+		return nil, err
+	}
+
+	return i.evaluate(result)
 }
 
 func (i *Interpreter) let(l *ast.Let) (*ast.Literal, error) {
@@ -189,16 +269,14 @@ func (i *Interpreter) let(l *ast.Let) (*ast.Literal, error) {
 }
 
 func (i *Interpreter) assignment(a *ast.Assignment) (*ast.Literal, error) {
-	name := a.Name.Lexeme
 	value, err := i.evaluate(a.Value)
 	if err != nil {
 		return nil, err
 	}
 
-	found := i.env.Set(name, value)
-
+	found := i.setVariable(a, a.Name, value)
 	if !found {
-		return nil, &Error{a.Name, fmt.Sprintf("undefined variable %q", name)}
+		return nil, &Error{a.Name, fmt.Sprintf("undefined variable %q", a.Name.Lexeme)}
 	}
 
 	return value, nil
@@ -224,12 +302,10 @@ func (i *Interpreter) logical(l *ast.Logical) (*ast.Literal, error) {
 }
 
 func (i *Interpreter) variable(v *ast.Variable) (*ast.Literal, error) {
-	key := v.Identifier.Lexeme
+	rawValue, defined := i.lookUpVariable(v, v.Identifier)
 
-	rawValue, found := i.env.Get(key)
-
-	if !found {
-		return nil, &Error{v.Identifier, fmt.Sprintf("undefined variable %q", key)}
+	if !defined {
+		return nil, &Error{v.Identifier, fmt.Sprintf("undefined variable %q", v.Identifier)}
 	}
 
 	value, err := i.evaluate(rawValue)
@@ -237,8 +313,26 @@ func (i *Interpreter) variable(v *ast.Variable) (*ast.Literal, error) {
 		return nil, err
 	}
 
-	_ = i.env.Set(key, value)
+	i.setVariable(v, v.Identifier, value)
 	return value, nil
+}
+
+func (i *Interpreter) lookUpVariable(e ast.Expression, name token.Token) (ast.Expression, bool) {
+	distance, found := i.locals[e]
+	if !found {
+		return i.globals.Get(name.Lexeme)
+	}
+
+	return i.env.GetAt(distance, name.Lexeme)
+}
+
+func (i *Interpreter) setVariable(e ast.Expression, name token.Token, value ast.Expression) bool {
+	distance, found := i.locals[e]
+	if !found {
+		return i.globals.Set(name.Lexeme, value)
+	}
+
+	return i.env.SetAt(distance, name.Lexeme, value)
 }
 
 func (i *Interpreter) literal(l *ast.Literal) (*ast.Literal, error) {
