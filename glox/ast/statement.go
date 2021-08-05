@@ -17,7 +17,7 @@ type PrintStatement struct {
 }
 
 func (p *PrintStatement) String() string {
-	return fmt.Sprintf("PrintStatement{%s}", p.Expression)
+	return fmt.Sprintf("<PrintStatement{%s}>", p.Expression)
 }
 
 type ExpressionStatement struct {
@@ -25,7 +25,7 @@ type ExpressionStatement struct {
 }
 
 func (e *ExpressionStatement) String() string {
-	return fmt.Sprintf("ExpressionStatement{%s}", e.Expression)
+	return fmt.Sprintf("<ExpressionStatement{%s}>", e.Expression)
 }
 
 type VarStatement struct {
@@ -34,7 +34,7 @@ type VarStatement struct {
 }
 
 func (v *VarStatement) String() string {
-	return fmt.Sprintf("VarStatement{%s = %s}", v.Name, v.Initializer)
+	return fmt.Sprintf("<VarStatement{%s = %s}>", v.Name, v.Initializer)
 }
 
 type BlockStatement struct {
@@ -49,7 +49,7 @@ func (b *BlockStatement) String() string {
 
 	contents := strings.Join(statementStrings, ", ")
 
-	return fmt.Sprintf("BlockStatement{%s}", contents)
+	return fmt.Sprintf("<BlockStatement{%s}>", contents)
 }
 
 type IfStatement struct {
@@ -64,7 +64,7 @@ func (i *IfStatement) String() string {
 		elseStr = (*i.ElseBranch).String()
 	}
 
-	return fmt.Sprintf("IfStatement{Condition:%s, Then:%s, Else:%s}", i.Condition, i.ThenBranch, elseStr)
+	return fmt.Sprintf("<IfStatement{Condition:%s, Then:%s, Else:%s}>", i.Condition, i.ThenBranch, elseStr)
 }
 
 type WhileStatement struct {
@@ -73,7 +73,32 @@ type WhileStatement struct {
 }
 
 func (w *WhileStatement) String() string {
-	return fmt.Sprintf("WhileStatement{Condition:%s, Body: %s}", w.Condition, w.Body)
+	return fmt.Sprintf("<WhileStatement{Condition:%s, Body: %s}>", w.Condition, w.Body)
+}
+
+type FunctionStatement struct {
+	Name   token.Token
+	Params []token.Token
+	Body   []Statement
+}
+
+func (f *FunctionStatement) String() string {
+	var params []string
+	for _, p := range f.Params {
+		params = append(params, p.String())
+	}
+
+	paramsStr := strings.Join(params, ", ")
+	return fmt.Sprintf("<Function{%s(%s){...}}>", f.Name.String(), paramsStr)
+}
+
+type ReturnStatement struct {
+	Keyword token.Token
+	Value   Expression
+}
+
+func (r *ReturnStatement) String() string {
+	return fmt.Sprintf("<Return{%s}>", r.Value)
 }
 
 func (p *PrintStatement) IsStatement()      {}
@@ -82,6 +107,8 @@ func (v *VarStatement) IsStatement()        {}
 func (b *BlockStatement) IsStatement()      {}
 func (i *IfStatement) IsStatement()         {}
 func (w *WhileStatement) IsStatement()      {}
+func (f *FunctionStatement) IsStatement()   {}
+func (r *ReturnStatement) IsStatement()     {}
 
 var (
 	_ Statement = &PrintStatement{}
@@ -90,4 +117,6 @@ var (
 	_ Statement = &BlockStatement{}
 	_ Statement = &IfStatement{}
 	_ Statement = &WhileStatement{}
+	_ Statement = &FunctionStatement{}
+	_ Statement = &ReturnStatement{}
 )

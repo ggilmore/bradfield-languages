@@ -37,3 +37,21 @@ func (e *Error) Error() string {
 func (e *Error) IsLoxLanguageError() {}
 
 var _ errutil.LoxLanguageError = &Error{}
+
+type returnValue interface {
+	ReturnValue() ast.Expression
+}
+
+type returnError struct {
+	Value ast.Expression
+}
+
+func (e *returnError) Error() string {
+	return "This is a return statement."
+}
+
+func (e *returnError) ReturnValue() ast.Expression {
+	return e.Value
+}
+
+var _ returnValue = &returnError{}

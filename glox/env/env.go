@@ -34,6 +34,34 @@ func (e *Environment) Get(name string) (value ast.Expression, found bool) {
 	return nil, false
 }
 
+func (e *Environment) GetAt(distance int, name string) (value ast.Expression, found bool) {
+	environment := e.ancestor(distance)
+
+	value, found = environment.storage[name]
+	return value, found
+}
+
+func (e *Environment) SetAt(distance int, name string, value ast.Expression) bool {
+	environment := e.ancestor(distance)
+
+	_, found := environment.storage[name]
+	if found {
+		environment.storage[name] = value
+		return true
+	}
+
+	return false
+}
+
+func (e *Environment) ancestor(distance int) *Environment {
+	current := e
+	for i := 0; i < distance; i++ {
+		current = current.Parent
+	}
+
+	return current
+}
+
 // Define sets the value of "name" to "value" within the current scope.
 func (e *Environment) Define(name string, value ast.Expression) {
 	e.storage[name] = value

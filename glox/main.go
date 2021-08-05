@@ -40,6 +40,7 @@ func runFile(path string) {
 		printError(fmt.Errorf("opening %q: %w", path, err))
 		die(err)
 	}
+
 	runner := newRunner()
 	err = runner.Run(f)
 	if err != nil {
@@ -101,6 +102,12 @@ func (r *runner) Run(input io.Reader) error {
 	statements, err := parser.NewParser(tokens).Parse()
 	if err != nil {
 		return fmt.Errorf("while parsing: %w", err)
+	}
+
+	resolver := interpreter.NewResolver(r.interpreter)
+	err = resolver.Resolve(statements)
+	if err != nil {
+		return fmt.Errorf("while resolving: %w", err)
 	}
 
 	err = r.interpreter.Interpret(statements)

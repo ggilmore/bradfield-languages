@@ -3,6 +3,7 @@ package ast
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/ggilmore/bradfield-languages/glox/token"
 )
@@ -19,7 +20,7 @@ type Binary struct {
 }
 
 func (b *Binary) String() string {
-	return fmt.Sprintf("Binary{Left: %s, Operator: %s, Right: %s}", b.Left, b.Operator, b.Right)
+	return fmt.Sprintf("<Binary{Left: %s, Operator: %s, Right: %s}>", b.Left, b.Operator, b.Right)
 }
 
 type Grouping struct {
@@ -27,7 +28,7 @@ type Grouping struct {
 }
 
 func (g *Grouping) String() string {
-	return fmt.Sprintf("Grouping{%s}", g.Expression)
+	return fmt.Sprintf("<Grouping{%s}>", g.Expression)
 }
 
 type Literal struct {
@@ -35,7 +36,7 @@ type Literal struct {
 }
 
 func (l *Literal) String() string {
-	return fmt.Sprintf("Literal{%s}", l.Value)
+	return fmt.Sprintf("<Literal{%s}>", l.Value)
 }
 
 func (l *Literal) Output() string {
@@ -59,7 +60,7 @@ type Unary struct {
 }
 
 func (u *Unary) String() string {
-	return fmt.Sprintf("Unary{Operator: %s, Right: %s}", u.Operator, u.Right)
+	return fmt.Sprintf("<Unary{Operator: %s, Right: %s}>", u.Operator, u.Right)
 }
 
 type Variable struct {
@@ -67,7 +68,7 @@ type Variable struct {
 }
 
 func (v Variable) String() string {
-	return fmt.Sprintf("Variable{%s}", v.Identifier)
+	return fmt.Sprintf("<Variable{%s}>", v.Identifier)
 }
 
 type Let struct {
@@ -77,7 +78,7 @@ type Let struct {
 }
 
 func (l *Let) String() string {
-	return fmt.Sprintf("Let{Identifier: %s, Init: %s, Body:%s}", l.Identifier, l.Init, l.Body)
+	return fmt.Sprintf("<Let{Identifier: %s, Init: %s, Body:%s}>", l.Identifier, l.Init, l.Body)
 }
 
 type Assignment struct {
@@ -86,7 +87,7 @@ type Assignment struct {
 }
 
 func (a *Assignment) String() string {
-	return fmt.Sprintf("Assignment{Name: %s, Value: %s}", a.Name, a.Value)
+	return fmt.Sprintf("<Assignment{Name: %s, Value: %s}>", a.Name, a.Value)
 }
 
 type Logical struct {
@@ -96,7 +97,7 @@ type Logical struct {
 }
 
 func (l *Logical) String() string {
-	return fmt.Sprintf("Logical{Left: %s, Operator: %s, Right: %s}", l.Left, l.Operator, l.Right)
+	return fmt.Sprintf("Logical<{Left: %s, Operator: %s, Right: %s}>", l.Left, l.Operator, l.Right)
 }
 
 type Debug struct {
@@ -109,6 +110,22 @@ func (d *Debug) String() string {
 	return "Debug{}"
 }
 
+type Call struct {
+	Callee    Expression
+	Paren     token.Token
+	Arguments []Expression
+}
+
+func (c *Call) String() string {
+	var args []string
+	for _, arg := range c.Arguments {
+		args = append(args, arg.String())
+	}
+
+	argsStr := strings.Join(args, ", ")
+	return fmt.Sprintf("Call{%s(%s)}", c.Callee, argsStr)
+}
+
 func (b *Binary) isExpression()     {}
 func (g *Grouping) isExpression()   {}
 func (l *Literal) isExpression()    {}
@@ -118,6 +135,7 @@ func (v *Variable) isExpression()   {}
 func (a *Assignment) isExpression() {}
 func (l *Logical) isExpression()    {}
 func (d *Debug) isExpression()      {}
+func (c *Call) isExpression()       {}
 
 var (
 	_ Expression = &Binary{}
@@ -129,4 +147,5 @@ var (
 	_ Expression = &Assignment{}
 	_ Expression = &Logical{}
 	_ Expression = &Debug{}
+	_ Expression = &Call{}
 )
